@@ -1,0 +1,8 @@
+ID,Zone,Resource,Total_Storage_MWh,Start_Storage_MWh,Change_in_Storage_MWh
+419,1,battery_candidate,0.0,208,-208.0
+420,2,battery_candidate,0.0,208,-208.0
+421,3,battery_candidate,0.0,208,-208.0
+422,4,battery_candidate,25114.0,208,24906.0
+423,5,battery_candidate,0.0,208,-208.0
+424,6,battery_candidate,8435.0,208,8227.0
+425,7,battery_candidate,4361.0,208,4153.0

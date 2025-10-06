@@ -1,0 +1,57 @@
+# scenarios.yml
+islands:
+  - sumatera
+  - jawa_bali
+  - kalimantan
+  - sulawesi
+  - north_maluku
+  - maluku
+  - papua
+  - nusa_tenggara
+
+years:
+  - "2030"
+
+scenarios:
+  - base
+  - grid
+  - gridcaptive
+  - captive
+  - nocoal
+  - highimportprice
+
+cleans:
+  - reference
+  - clean
+
+# per‑island baseline BAU CO₂ emissions
+island_params:
+  sumatera: 86780000
+  jawa_bali: 116430000
+  kalimantan: 34390000
+  sulawesi: 19410000
+  north_maluku: 3880000
+  maluku: 5820000
+  papua: 15520000
+  nusa_tenggara: 7760000
+
+# per‑year, per‑island CO2_limit values
+co2_limits:
+  "2030":
+    sumatera: 86780000
+    jawa_bali: 116430000
+    kalimantan: 34390000
+    sulawesi: 19410000
+    north_maluku: 3880000
+    maluku: 5820000
+    papua: 15520000
+    nusa_tenggara: 7760000
+  "2035":
+    sumatera: 60500000
+    jawa_bali: 81200000
+    kalimantan: 88600000
+    sulawesi: 13500000
+    north_maluku: 2700000
+    maluku: 4100000
+    papua: 10800000
+    nusa_tenggara: 5400000
