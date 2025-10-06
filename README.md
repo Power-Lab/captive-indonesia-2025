@@ -50,7 +50,7 @@ A scenario file (e.g., `scenario_2030.yml`) defines:
 - `island_params` and `co2_limits`: baseline BAU emissions and CO₂ caps per island/year
 
 You can adjust these values or add new keys to explore other scenarios.  
-More examples are provided in `scenario_2035_clean_1.yml`.
+More examples are provided in `scenario_2030_example`.
 
 ---
 
