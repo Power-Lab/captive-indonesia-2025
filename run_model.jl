@@ -4,6 +4,7 @@ using JuMP
 using Plots
 using DataFrames, CSV
 using Gurobi
+using HiGHS
 using Base.Filesystem: dirname, mkpath
 
 # 1) Load your core modeling code
@@ -58,7 +59,7 @@ base_dir    = @__DIR__
 inputs_path = joinpath(base_dir, "data_indonesia", year, island)
 
 # 7) Create a scenario‑specific results folder
-results_root = joinpath(base_dir, "results_nodc")
+results_root = joinpath(base_dir, "results")
 job_name     = "$(scenario)_$(island)_$(year)_$(clean)"
 results_dir  = joinpath(results_root, job_name)
 mkpath(results_dir)

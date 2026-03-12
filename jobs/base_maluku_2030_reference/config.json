@@ -1,0 +1,9 @@
+{
+  "island": "maluku",
+  "year": "2030",
+  "scenario": "base",
+  "clean": "reference",
+  "CO235reduction": false,
+  "BAUCO2emissions": 0.0,
+  "CO2_limit": 5820000
+}

@@ -1,0 +1,41 @@
+# scenario_maluku_test.yml
+#
+# Minimal test-case scenario using Maluku island only.
+#
+# Purpose
+# -------
+# Use this file to verify your Julia/Python environment on a local machine
+# before attempting a full multi-island run.  Maluku is the smallest grid in
+# the dataset (no network or industrial-park files required) so the
+# optimisation typically solves in a few minutes even without a Gurobi
+# academic licence.
+#
+# Scope
+# -----
+# - Single island : maluku
+# - Single year   : 2030
+# - Single scenario: base (no grid expansion, no captive generation)
+# - Single clean flag: reference (no CO₂ or RE constraints)
+#
+# As a result, generate_jobs.py will create exactly ONE job directory.
+
+islands:
+  - maluku
+
+years:
+  - "2030"
+
+scenarios:
+  - base
+
+cleans:
+  - reference
+
+# Baseline BAU CO₂ emissions for Maluku (tonnes CO₂)
+island_params:
+  maluku: 5820000
+
+# CO₂ cap used when the clean flag is active (not enforced in reference runs)
+co2_limits:
+  "2030":
+    maluku: 5820000
