@@ -20,154 +20,108 @@ It is written in **Julia** using **JuMP** for optimisation and is accompanied by
 
 ---
 
-## Quick Start
+## Getting Started
 
-1. **Clone the repository** and make sure you have **Python ≥ 3.8** and **Julia ≥ 1.6** installed.
+**Prerequisites:** [Julia ≥ 1.6](https://julialang.org/downloads/), Python ≥ 3.8, and a valid Gurobi licence.
 
-2. **Install Python dependencies** for the job generator:
+> Install Julia from the [official downloads page](https://julialang.org/downloads/) or via [juliaup](https://github.com/JuliaLang/juliaup). Avoid conda-forge Julia — package resolution is more reliable with the official toolchain.
+
+1. **Install Python dependencies:**
    ```bash
    pip install click pyyaml
    ```
 
-3. **Install Julia packages** used by the model:
-   ```julia
-   using Pkg
-   Pkg.activate(".")  # optional: create a local environment
-   Pkg.add(["JuMP", "DataFrames", "CSV", "JSON", "Gurobi", "Plots"])
+2. **Bootstrap the Julia environment** (once, from the repository root):
+   ```bash
+   julia --project=. bootstrap.jl
    ```
-   A valid **Gurobi licence** is required because the solver defaults to Gurobi.  
-   You can modify `optimizer.jl` to use an open-source solver such as **CPLEX** or **GLPK** if necessary.
-
-> **New to the model?** Run the [Maluku test case](#test-case-maluku-island-local) first — it uses a single small island with no grid or industrial-park data, so it solves quickly on any laptop.
+   This resolves and installs all Julia packages into a repo-local environment and confirms Gurobi can start. Takes about a minute the first time; instant on subsequent runs.
 
 ---
 
-## Preparing a Scenario File
+## First Run: Maluku Island
 
-A scenario file (e.g., `scenario_2030.yml`) defines:
-
-- `islands`: list of islands to model (e.g., `Sumatera`, `Jawa_Bali`)
-- `years`: list of planning years (e.g., `2030`, `2035`)
-- `scenarios`: names of policy/system configurations (`base`, `grid`, `captive`, `gridcaptive`, `nocoal`, `highimportprice`, …) that control flags in `run_model.jl`
-- `cleans`: whether to run a reference (`ref`) or clean (`clean`) case
-- `island_params` and `co2_limits`: baseline BAU emissions and CO₂ caps per island/year
-
-You can adjust these values or add new keys to explore other scenarios.  
-More examples are provided in `scenario_2030_example`.
-
----
-
-## Running the Model
-
-### Generate Job Directories
-
-From the repository root, run:
-```bash
-python generate_jobs.py --scenarios scenario_2030.yml     --submit-script submit_template.sb --output-dir jobs
-```
-
-This creates a `jobs/` directory containing one subfolder per island/year/scenario/clean combination.  
-Each job folder includes:
-- `config.json` (job parameters)
-- symbolic link to `submit_template.sb` (SLURM submission script)
-
-Add `--submit` to automatically submit jobs via `sbatch`.
-
-### Run Locally with `generate_jobs_local.py`
-
-For local development or single-machine runs, use `generate_jobs_local.py` instead of `generate_jobs.py`. It creates the same job directories and `config.json` files, then immediately executes each job in sequence via `julia run_model.jl` — no SLURM or `.sb` template required.
-
-```bash
-python generate_jobs_local.py \
-  --scenarios-file scenario_2030.yml \
-  --run-script run_model.jl \
-  --output-root jobs
-```
-
-The script prints a timestamped start and finish line for every job so you can track progress:
-```
-[2026-03-05T10:00:00] ▶ Starting job base_maluku_2030_reference
-[2026-03-05T10:04:32] ✅ Completed base_maluku_2030_reference (took 0:04:32)
-```
-
-### Run a Single Job Manually
-
-To run one job without either script:
-```bash
-cd jobs/<job_folder>
-julia ../../run_model.jl
-```
-
-`run_model.jl` reads the local `config.json`, determines the input data path and scenario toggles, and calls `function_compiler` to solve the model.  
-Results are written to `results/<job_name>/`, including CSVs for:
-- generation by technology
-- industrial park outputs
-- storage behaviour
-- transmission flows
-- cost breakdowns
-
----
-
-## Test Case: Maluku Island (Local)
-
-`scenario_maluku_test.yml` is a minimal scenario designed for **local development and smoke-testing**.  
-It targets a single island (`maluku`), a single year (`2030`), the `base` scenario (no grid expansion or captive generation), and the `reference` clean flag (no CO₂ or RE constraints).  
-This combination requires only the four CSV files that are present in `data_indonesia/2030/maluku/` — no network, zone, or industrial-park data — so it is the fastest job in the dataset.
-
-### Why Maluku?
-
-| Property | Detail |
-|---|---|
-| Island grid | Small, isolated — no interconnecting network required |
-| Input files needed | `demand.csv`, `fuels_data.csv`, `generators.csv`, `generators_variability.csv` |
-| Industrial-park files | Not required (no `ip_*` files in this folder) |
-| Typical solve time | A few minutes on a laptop |
-
-### Option A — Using `generate_jobs_local.py` (recommended for local runs)
-
-`generate_jobs_local.py` is purpose-built for local execution: it creates the job directory, writes `config.json`, and immediately runs the Julia model — all in one command. No SLURM template needed.
+`scenario_maluku_test.yml` is the recommended entry point. It runs a single small island (`maluku`, 2030, `base` scenario, no CO₂ constraints) that requires only four CSV files and typically solves in about a minute on a laptop.
 
 ```bash
 python generate_jobs_local.py \
   --scenarios-file scenario_maluku_test.yml \
   --run-script run_model.jl \
-  --output-root jobs_test
+  --output-root jobs
 ```
 
-The script prints timestamped progress for the single job and exits when it finishes.  
-Results are written to `results/base_maluku_2030_reference/` inside the repository root.
+Expected output:
+```
+[...] ▶ Preparing Julia environment
+[...] ✅ Julia environment ready (took 0:00:02)
 
-### Option B — Manual `config.json` (quickest start)
+[...] ▶ Starting job base_maluku_2030_reference
+[...] ✅ Completed base_maluku_2030_reference (took 0:01:00)
 
-If you want to skip `generate_jobs.py` entirely, create a `config.json` in the **repository root** and run the model directly from there:
-
-```bash
-# From the repository root, create config.json
-cat > config.json << 'EOF'
-{
-  "island": "maluku",
-  "year": "2030",
-  "scenario": "base",
-  "clean": "reference",
-  "CO235reduction": false,
-  "BAUCO2emissions": 0.0,
-  "CO2_limit": 5820000
-}
-EOF
-
-# Run the model
-julia run_model.jl
+🎉 All scenarios finished.
 ```
 
 Results are written to `results/base_maluku_2030_reference/`.
 
-### Extending the Test Case
-
-Once the base run completes successfully you can broaden the test by editing `scenario_maluku_test.yml`:
-
+Once this run succeeds, you can extend it by editing `scenario_maluku_test.yml`:
 - Add `"clean"` to the `cleans` list to enable CO₂ and RE constraints.
-- Add `"captive"` to `scenarios` — note this requires the `ip_*` input files, which are **not** present in `data_indonesia/2030/maluku/`; you would need to supply them first.
+- Add `"captive"` to `scenarios` — requires the `ip_*` input files not present in `data_indonesia/2030/maluku/`.
 - Add `"2035"` to `years` once the corresponding data folder is populated.
+
+---
+
+## Run a Custom Scenario Locally
+
+Create or edit a scenario YAML file (see [Preparing a Scenario File](#preparing-a-scenario-file)), then:
+
+```bash
+python generate_jobs_local.py \
+  --scenarios-file your_scenario.yml \
+  --run-script run_model.jl \
+  --output-root jobs
+```
+
+This creates one job folder per island/year/scenario/clean combination under `jobs/`, runs each sequentially, and writes results to `results/<job_name>/`.
+
+**Run a single job directly:**
+```bash
+julia --project=. run_model.jl --config jobs/<job_folder>/config.json
+```
+
+**Validate a config without solving** (preflight-only, useful before a long batch run):
+```bash
+julia --project=. run_model.jl --config jobs/<job_folder>/config.json --preflight-only
+```
+
+---
+
+## HPC / SLURM Batch
+
+`generate_jobs.py` generates job directories and SLURM submission scripts without running them locally:
+
+```bash
+python generate_jobs.py \
+  --scenarios-file scenario_2030_example.yml \
+  --submit-script submit_template.sb \
+  --output-root jobs
+```
+
+Add `--submit` to automatically call `sbatch` on each generated job folder.
+
+---
+
+## Preparing a Scenario File
+
+A scenario file (e.g., `scenario_2030_example.yml`) defines:
+
+- `islands`: list of islands to model (e.g., `sumatera`, `jawa_bali`)
+- `years`: list of planning years (e.g., `2030`, `2035`)
+- `scenarios`: policy/system configurations that control flags in `run_model.jl` — valid values are `base`, `grid`, `captive`, `gridcaptive`, `nocoal`, `highimportprice`
+- `cleans`: `reference` (no CO₂ or RE constraints) or `clean` (constraints active)
+- `island_params`: baseline BAU CO₂ emissions per island (tonnes CO₂), used when `clean` is active
+- `co2_limits`: CO₂ cap per island per year
+
+See `scenario_maluku_test.yml` for a minimal working example and `scenario_2030_example.yml` for a full multi-island run.
 
 ---
 
@@ -183,7 +137,7 @@ Once the base run completes successfully you can broaden the test by editing `sc
 
 ### Changing Solver or Tolerance
 - The default solver is **Gurobi** with a **0.1 % MIP gap** tolerance.
-- Edit `run_model.jl` to change solver options or use another MILP solver.
+- Edit `run_model.jl` or `functions/optimizer.jl` to change solver options.
 
 ### Benders Decomposition
 - For large problems, use the optional implementation in `functions/benders_decomposition.jl`.
@@ -205,6 +159,20 @@ After solving, each job’s results folder contains:
 | `transmission_results.csv` | (If provided) power flows across transmission links. |
 
 You can import these CSVs into **Python (pandas)** or **Julia** for analysis and visualisation.
+
+---
+
+## Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---------|--------------|-----|
+| `julia: command not found` | Julia not on PATH | Install from [julialang.org](https://julialang.org/downloads/) or via juliaup, then restart your terminal |
+| `Error: Gurobi is installed but could not start a licensed optimizer session` | Licence missing, expired, or wrong path | Ensure `GRB_LICENSE_FILE` points to a valid `gurobi.lic`; run `gurobi_cl` to confirm |
+| `Error: Config file not found` | Wrong working directory or missing `--config` flag | Run from the repo root: `julia --project=. run_model.jl --config jobs/<job>/config.json` |
+| `Error: Unknown scenario: <name>` | Typo in `scenarios` list | Valid values: `base`, `grid`, `captive`, `gridcaptive`, `highimportprice`, `nocoal` |
+| `Error: Missing required input files … ip_generators.csv` | `captive` or `gridcaptive` on an island with no `ip_*` files | Supply the `ip_*` CSVs or remove captive scenarios for that island |
+| `Error: Missing required input files … network.csv` | `grid`, `gridcaptive`, or `nocoal` on an island with no network data | Supply `network.csv` or use `base`/`captive` scenarios instead |
+| Julia package error on first run | Stale or missing `Manifest.toml` | Run `julia --project=. bootstrap.jl` to resolve and reinstall |
 
 ---
 
