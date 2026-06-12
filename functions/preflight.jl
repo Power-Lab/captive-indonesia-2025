@@ -45,21 +45,23 @@ function load_config(config_path::AbstractString)
 end
 
 function scenario_settings(scenario::AbstractString)
+    # "captive" and "gridcaptive" are legacy aliases from the industrial-park
+    # studies; they map to the same settings as "village" and "gridvillage".
     if scenario == "base"
-        return (Grid = false, Captive = false, ImportPrice = 59.0, NoCoal = false)
-    elseif scenario == "gridcaptive"
-        return (Grid = true, Captive = true, ImportPrice = 59.0, NoCoal = false)
+        return (Grid = false, VillageBuild = false, ImportPrice = 59.0, NoCoal = false)
+    elseif scenario == "gridvillage" || scenario == "gridcaptive"
+        return (Grid = true, VillageBuild = true, ImportPrice = 59.0, NoCoal = false)
     elseif scenario == "grid"
-        return (Grid = true, Captive = false, ImportPrice = 59.0, NoCoal = false)
-    elseif scenario == "captive"
-        return (Grid = false, Captive = true, ImportPrice = 59.0, NoCoal = false)
+        return (Grid = true, VillageBuild = false, ImportPrice = 59.0, NoCoal = false)
+    elseif scenario == "village" || scenario == "captive"
+        return (Grid = false, VillageBuild = true, ImportPrice = 59.0, NoCoal = false)
     elseif scenario == "highimportprice"
-        return (Grid = true, Captive = true, ImportPrice = 59.0 * 1.21, NoCoal = false)
+        return (Grid = true, VillageBuild = true, ImportPrice = 59.0 * 1.21, NoCoal = false)
     elseif scenario == "nocoal"
-        return (Grid = true, Captive = false, ImportPrice = 59.0, NoCoal = true)
+        return (Grid = true, VillageBuild = false, ImportPrice = 59.0, NoCoal = true)
     end
 
-    error("Unknown scenario: $(scenario)")
+    error("Unknown scenario: $(scenario). Valid values: base, grid, village, gridvillage, highimportprice, nocoal")
 end
 
 function clean_settings(clean::AbstractString)
@@ -84,12 +86,12 @@ function expected_input_files(flags)
         push!(required, "network.csv")
     end
 
-    if flags.Captive
+    if flags.VillageBuild
         append!(required, [
-            "ip_generators.csv",
-            "ip_demand.csv",
-            "ip_demandheat.csv",
-            "ip_generators_variability.csv",
+            "village_generators.csv",
+            "village_demand.csv",
+            "village_demandheat.csv",
+            "village_generators_variability.csv",
         ])
     end
 

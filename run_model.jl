@@ -27,16 +27,17 @@ CO235reduction   = cfg["CO235reduction"]
 BAUCO2emissions  = cfg["BAUCO2emissions"]
 CO2_limit        = cfg["CO2_limit"]
 
-# 3) Baseline model settings
-mipgap         = 0.01
+# 3) Baseline model settings — overridable per job via optional config.json keys
+mipgap         = Float64(get(cfg, "mipgap", 0.01))            # relative MIP gap
 CO2_constraint = preflight.clean_flags.CO2_constraint
 RE_constraint  = preflight.clean_flags.RE_constraint
-RE_limit       = 0.34
+RE_limit       = Float64(get(cfg, "RE_limit", 0.34))          # min RE share (clean runs)
+village_storage_max_mwh = Float64(get(cfg, "village_storage_max_mwh", 208.0)) # per-unit cap on new village storage
 
 # 4) Scenario toggles
 Grid = preflight.flags.Grid
-Captive = preflight.flags.Captive
-ImportPrice = preflight.flags.ImportPrice
+VillageBuild = preflight.flags.VillageBuild
+ImportPrice = Float64(get(cfg, "import_price", preflight.flags.ImportPrice)) # $/MWh village grid imports
 NoCoal = preflight.flags.NoCoal
 
 if preflight_only
@@ -61,9 +62,10 @@ function_compiler(
     RE_constraint,
     RE_limit,
     Grid,
-    Captive,
+    VillageBuild,
     ImportPrice,
     NoCoal,
     CO235reduction,
-    BAUCO2emissions
+    BAUCO2emissions;
+    village_storage_max_mwh = village_storage_max_mwh
 )

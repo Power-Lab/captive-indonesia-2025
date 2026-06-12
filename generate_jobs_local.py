@@ -86,6 +86,10 @@ def main(scenarios_file, run_script, output_root, bootstrap):
             'BAUCO2emissions':   (bau_val if reduction_active else 0.0),
             'CO2_limit':         co2_lim
         }
+        # optional model parameters passed through from the scenario YAML
+        for key in ('mipgap', 'RE_limit', 'import_price', 'village_storage_max_mwh'):
+            if key in data:
+                cfg[key] = data[key]
         (job_dir / 'config.json').write_text(json.dumps(cfg, indent=2))
 
         # run

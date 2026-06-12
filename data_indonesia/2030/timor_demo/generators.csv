@@ -1,0 +1,13 @@
+R_ID,Zone,Resource,technology,owner,Existing_Cap_MW,Existing_Cap_MWh,New_Build,Max_Cap_MW,Inv_Cost_per_MWyr,Inv_Cost_per_MWhyr,Fixed_OM_Cost_per_MWyr,Fixed_OM_Cost_per_MWhyr,Var_OM_Cost_per_MWh,Min_Power_MW,Ramp_Up_Percentage,Ramp_Dn_Percentage,Commit,Start_Cost_per_MW,Start_Fuel_MMBTU_per_MW,Heat_Rate_MMBTU_per_MWh,Fuel,Up_Time,Down_Time,Eff_Up,Eff_Down,STOR,VRE,RE,THERM
+1,1,pltu_bolok_1,coal,pln,16.5,0,0,0,0,0,40000,0,4,0.4,0.3,0.3,1,60,1.5,10.5,coal,8,8,1,1,0,0,0,1
+2,1,pltu_bolok_2,coal,pln,16.5,0,0,0,0,0,40000,0,4,0.4,0.3,0.3,1,60,1.5,10.5,coal,8,8,1,1,0,0,0,1
+3,1,pltmg_kupang_peaker,gas,pln,40.0,0,0,0,0,0,25000,0,5,0.3,1.0,1.0,1,30,0.5,7.8,gas,2,2,1,1,0,0,0,1
+4,1,pltd_tenau,diesel,pln,30.0,0,0,0,0,0,15000,0,6,0.3,1.0,1.0,1,20,0.3,9.5,diesel,1,1,1,1,0,0,0,1
+5,1,pltd_kuanino,diesel,pln,10.0,0,0,0,0,0,15000,0,6,0.3,1.0,1.0,1,20,0.3,9.5,diesel,1,1,1,1,0,0,0,1
+6,2,pltd_soe,diesel,pln,8.0,0,0,0,0,0,15000,0,6,0.3,1.0,1.0,1,20,0.3,9.8,diesel,1,1,1,1,0,0,0,1
+7,2,pltd_kefamenanu,diesel,pln,6.0,0,0,0,0,0,15000,0,6,0.3,1.0,1.0,1,20,0.3,9.8,diesel,1,1,1,1,0,0,0,1
+8,1,plts_kupang,solar,pln,5.0,0,0,0,0,0,9000,0,0,0,1,1,0,0,0,0,None,0,0,1,1,0,1,1,0
+9,1,plts_candidate_kupang,solar,pln,0.0,0,1,50,65000,0,9000,0,0,0,1,1,0,0,0,0,None,0,0,1,1,0,1,1,0
+10,2,plts_candidate_soe,solar,pln,0.0,0,1,20,65000,0,9000,0,0,0,1,1,0,0,0,0,None,0,0,1,1,0,1,1,0
+11,1,batt_candidate_kupang,battery,pln,0,0,1,20,25000,15000,5000,2000,1,0,1,1,0,0,0,0,None,0,0,0.92,0.92,1,0,0,0
+12,2,batt_candidate_soe,battery,pln,0,0,1,10,25000,15000,5000,2000,1,0,1,1,0,0,0,0,None,0,0,0.92,0.92,1,0,0,0

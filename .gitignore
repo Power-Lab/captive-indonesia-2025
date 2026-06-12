@@ -1,0 +1,11 @@
+# macOS
+.DS_Store
+
+# Run logs
+*.log
+
+# Julia
+*.jl.cov
+*.jl.*.cov
+*.jl.mem
+/docs/build/
