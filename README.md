@@ -22,7 +22,7 @@ It is written in **Julia** using **JuMP** for optimisation and is accompanied by
 
 ## Getting Started
 
-**Prerequisites:** [Julia](https://julialang.org/downloads/) (tested with 1.12; `Manifest.toml` pins exact package versions), Python ≥ 3.8, and a valid Gurobi licence — see `docs/environment_setup.md` for licence options and environment hardening.
+**Prerequisites:** [Julia](https://julialang.org/downloads/) (tested with 1.12; `Manifest.toml` pins exact package versions), Python ≥ 3.8, and a valid Gurobi licence — see `docs/environment_setup.md` for licence options, **Windows + conda setup**, and environment hardening.
 
 > Install Julia from the [official downloads page](https://julialang.org/downloads/) or via [juliaup](https://github.com/JuliaLang/juliaup). Avoid conda-forge Julia — package resolution is more reliable with the official toolchain.
 

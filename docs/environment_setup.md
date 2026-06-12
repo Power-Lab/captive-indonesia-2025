@@ -31,6 +31,51 @@ several Pythons (system, Homebrew, conda); `ModuleNotFoundError: No module
 named 'click'` means you ran a different one. `which python python3` and pick
 the conda/miniforge one, or create a venv.
 
+## Windows + conda
+
+The model runs on Windows — the Julia code uses `joinpath` throughout and the
+local runner (`generate_jobs_local.py`) has no Unix dependencies. The friction
+is all environment setup, not the code. Four points:
+
+1. **Use conda for Python, not for Julia.** A conda/miniforge environment is a
+   good home for the `click`/`pyyaml` dependencies. But install **Julia itself
+   via [juliaup](https://github.com/JuliaLang/juliaup) or the official Windows
+   installer — not conda-forge Julia.** conda-forge Julia has known artifact /
+   C-runtime resolution problems with `Gurobi.jl` (the model will fail to build
+   or solve). This is about which Julia *build* you use, independent of OS.
+
+2. **`julia` must be on PATH in the same shell as your Python.**
+   `generate_jobs_local.py` shells out to `julia`, so if you launch it from a
+   conda prompt, `julia` has to be visible there too. Check with `where julia`
+   (Command Prompt) or `Get-Command julia` (PowerShell). juliaup adds it to PATH
+   on install; restart the shell afterwards.
+
+3. **Set the Gurobi licence via a Windows environment variable**, not `export`:
+   ```bat
+   setx GRB_LICENSE_FILE "C:\path\to\gurobi.lic"
+   ```
+   (or System Properties → Environment Variables). Reopen the shell so it picks
+   up the change. Gurobi runs natively on Windows.
+
+4. **Put multi-line commands on one line.** The bash examples in this repo use
+   `\` line continuations, which do not work in Command Prompt or PowerShell.
+   Either put the whole command on a single line, e.g.
+
+   ```bat
+   python generate_jobs_local.py --scenarios-file scenario_timor_demo.yml --run-script run_model.jl --output-root jobs
+   ```
+
+   or use the shell's own continuation character (`^` in cmd, `` ` `` in
+   PowerShell).
+
+**Do not use `generate_jobs.py` on Windows** — it creates symlinks and calls
+`sbatch`, which are for Linux HPC/SLURM clusters only. On a Windows laptop use
+`generate_jobs_local.py` (or run a single job directly with
+`julia --project=. run_model.jl --config <job>/config.json`).
+
+A good first test on Windows is the Maluku run from the README, then the
+`timor_demo` village scenarios — both solve in minutes on a laptop.
+
 ## Gurobi licensing
 
 The model is a MILP (binary unit commitment), solved with Gurobi by default.
