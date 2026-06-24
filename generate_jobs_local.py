@@ -1,12 +1,21 @@
 #!/usr/bin/env python3
 import json
 import subprocess
+from datetime import datetime
 from itertools import product
 from pathlib import Path
-from datetime import datetime
 
 import click
 import yaml
+
+
+def run_command(command, cwd, failure_message):
+    try:
+        subprocess.run(command, cwd=cwd, check=True)
+    except FileNotFoundError as exc:
+        raise click.ClickException("Julia executable was not found on PATH.") from exc
+    except subprocess.CalledProcessError as exc:
+        raise click.ClickException(f"{failure_message} (exit code {exc.returncode}).") from exc
 
 @click.command()
 @click.option('--scenarios-file', '-s',
@@ -21,8 +30,14 @@ import yaml
               type=click.Path(),
               default='jobs',
               help='Directory under which to make per-scenario folders.')
-def main(scenarios_file, run_script, output_root):
+@click.option('--bootstrap/--no-bootstrap', default=True,
+              help='Instantiate the Julia project and validate Gurobi before running jobs.')
+def main(scenarios_file, run_script, output_root, bootstrap):
     """Generate configs and run each scenario locally, reporting start & finish times."""
+    repo_root = Path(__file__).resolve().parent
+    run_script_path = Path(run_script).resolve()
+    project_flag = f'--project={repo_root}'
+
     # load scenarios
     data = yaml.safe_load(Path(scenarios_file).read_text())
     islands       = data['islands']
@@ -34,6 +49,17 @@ def main(scenarios_file, run_script, output_root):
 
     jobs_root = Path(output_root)
     jobs_root.mkdir(parents=True, exist_ok=True)
+
+    if bootstrap:
+        start = datetime.now()
+        click.echo(f"[{start.isoformat()}] ▶ Preparing Julia environment")
+        run_command(
+            ['julia', project_flag, str(repo_root / 'bootstrap.jl')],
+            cwd=repo_root,
+            failure_message='Julia environment bootstrap failed'
+        )
+        end = datetime.now()
+        click.echo(f"[{end.isoformat()}] ✅ Julia environment ready (took {end - start})\n")
 
     for isl, yr, scn, cln in product(islands, years, scns, cleans):
         name    = f"{scn}_{isl}_{yr}_{cln}"
@@ -60,14 +86,25 @@ def main(scenarios_file, run_script, output_root):
             'BAUCO2emissions':   (bau_val if reduction_active else 0.0),
             'CO2_limit':         co2_lim
         }
+        # optional model parameters passed through from the scenario YAML
+        for key in ('mipgap', 'RE_limit', 'import_price', 'village_storage_max_mwh'):
+            if key in data:
+                cfg[key] = data[key]
         (job_dir / 'config.json').write_text(json.dumps(cfg, indent=2))
 
         # run
         start = datetime.now()
         click.echo(f"[{start.isoformat()}] ▶ Starting job {name}")
-        subprocess.run(
-            ['julia', str(Path(run_script).resolve())],
-            cwd=job_dir, check=True
+        run_command(
+            [
+                'julia',
+                project_flag,
+                str(run_script_path),
+                '--config',
+                str((job_dir / 'config.json').resolve()),
+            ],
+            cwd=repo_root,
+            failure_message=f"Job {name} failed"
         )
         end = datetime.now()
         elapsed = end - start

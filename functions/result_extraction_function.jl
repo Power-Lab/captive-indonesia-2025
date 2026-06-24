@@ -14,23 +14,29 @@ function result_extraction(
     # 0) ensure output folder exists
     mkpath(results_dir)
 
-    # 1) Compute generation totals
+    # 1) Compute generation totals.
+    # Materialise each JuMP value container ONCE — indexing value.(...) inside a
+    # loop re-evaluates the whole container every iteration (pathological at
+    # hundreds of villages).
+    GENv = value.(solution.GEN)
     NG = size(inputs.G, 1)
     generation = zeros(NG)
     for i in 1:NG
-        generation[i] = sum(value.(solution.GEN)[:, inputs.G[i]].data)
+        generation[i] = sum(GENv[:, inputs.G[i]].data)
     end
 
-    NIPG = size(inputs.IP_G, 1)
-    ip_generation = zeros(NIPG)
-    for i in 1:NIPG
-        ip_generation[i] = sum(value.(solution.IP_GEN)[:, inputs.IP_G[i]].data)
+    VILGENv = value.(solution.VIL_GEN)
+    NVILG = size(inputs.VIL_G, 1)
+    village_generation = zeros(NVILG)
+    for i in 1:NVILG
+        village_generation[i] = sum(VILGENv[:, inputs.VIL_G[i]].data)
     end
 
-    NIPUC = size(inputs.IP_UC, 1)
-    ip_heat_generation = zeros(NIPUC)
-    for i in 1:NIPUC
-        ip_heat_generation[i] = sum(value.(solution.IP_GEN_HEAT)[:, inputs.IP_UC[i]].data)
+    VILGENHEATv = value.(solution.VIL_GEN_HEAT)
+    NVILUC = size(inputs.VIL_UC, 1)
+    village_heat_generation = zeros(NVILUC)
+    for i in 1:NVILUC
+        village_heat_generation[i] = sum(VILGENHEATv[:, inputs.VIL_UC[i]].data)
     end
 
     total_demand = sum(sum.(eachcol(demand)))
@@ -57,45 +63,65 @@ function result_extraction(
         New_Build      = inputs.generators.New_Build[inputs.G],
     )
 
-    ip_generators = DataFrame(
-        ID                   = inputs.IP_G,
-        Resource             = inputs.ip_generators.Resource[inputs.IP_G],
-        Zone                 = inputs.ip_generators.Zone[inputs.IP_G],
-        Industrial_Park      = inputs.ip_generators.Industrial_Park[inputs.IP_G],
-        technology           = inputs.ip_generators.technology[inputs.IP_G],
-        Total_MW             = value.(solution.IP_CAP).data,
-        Start_MW             = inputs.ip_generators.Existing_Cap_MW[inputs.IP_G],
-        Change_in_MW         = value.(solution.IP_CAP).data .- inputs.ip_generators.Existing_Cap_MW[inputs.IP_G],
-        Electricity_GWh      = ip_generation ./ 1000,
-        commodity            = inputs.ip_generators.commodity[inputs.IP_G],
-        plant_owner          = inputs.ip_generators.plant_owner[inputs.IP_G],
-        owner_parent_company = inputs.ip_generators.owner_parent_company[inputs.IP_G],
-        owner_home_country_flag = inputs.ip_generators.owner_home_country_flag[inputs.IP_G],
+    village_generators = DataFrame(
+        ID                   = inputs.VIL_G,
+        Resource             = inputs.village_generators.Resource[inputs.VIL_G],
+        Zone                 = inputs.village_generators.Zone[inputs.VIL_G],
+        Village              = inputs.village_generators.Village[inputs.VIL_G],
+        technology           = inputs.village_generators.technology[inputs.VIL_G],
+        Total_MW             = value.(solution.VIL_CAP).data,
+        Start_MW             = inputs.village_generators.Existing_Cap_MW[inputs.VIL_G],
+        Change_in_MW         = value.(solution.VIL_CAP).data .- inputs.village_generators.Existing_Cap_MW[inputs.VIL_G],
+        Electricity_GWh      = village_generation ./ 1000,
     )
 
-    ip_heat_generators = DataFrame(
-        ID                  = inputs.IP_UC,
-        Resource            = inputs.ip_generators.Resource[inputs.IP_UC],
-        Zone                = inputs.ip_generators.Zone[inputs.IP_UC],
-        Industrial_Park     = inputs.ip_generators.Industrial_Park[inputs.IP_UC],
-        technology          = inputs.ip_generators.technology[inputs.IP_UC],
-        commodity           = inputs.ip_generators.commodity[inputs.IP_UC],
-        GWh                 = ip_heat_generation ./ 1000
+    village_heat_generators = DataFrame(
+        ID                  = inputs.VIL_UC,
+        Resource            = inputs.village_generators.Resource[inputs.VIL_UC],
+        Zone                = inputs.village_generators.Zone[inputs.VIL_UC],
+        Village             = inputs.village_generators.Village[inputs.VIL_UC],
+        technology          = inputs.village_generators.technology[inputs.VIL_UC],
+        GWh                 = village_heat_generation ./ 1000
     )
 
-    if all(value.(solution.IP_IMPORT) .== 0)
-        ip_import = DataFrame(
-            ID               = inputs.IP,
-            Zone             = inputs.ip_generators.Zone[inputs.IP],
-            Total_Import_MWh = zeros(length(inputs.IP)),
-            Peak_Import_MW   = zeros(length(inputs.IP)),
+    # Materialise village import/export value containers once (0 sentinel when
+    # not a Grid scenario).
+    VILIMPORTv = solution.VIL_IMPORT == 0 ? 0 : value.(solution.VIL_IMPORT)
+    VILEXPORTv = solution.VIL_EXPORT == 0 ? 0 : value.(solution.VIL_EXPORT)
+
+    if VILIMPORTv == 0 || all(VILIMPORTv .== 0)
+        village_import = DataFrame(
+            ID               = inputs.VIL,
+            Zone             = [inputs.village_zone[v] for v in inputs.VIL],
+            Total_Import_MWh = zeros(length(inputs.VIL)),
+            Peak_Import_MW   = zeros(length(inputs.VIL)),
         )
     else
-        ip_import = DataFrame(
-            ID               = inputs.IP,
-            Zone             = inputs.ip_generators.Zone[inputs.IP],
-            Total_Import_MWh = vec(sum(value.(solution.IP_IMPORT)[:, inputs.IP].data, dims=1)),
-            Peak_Import_MW   = vec(maximum(value.(solution.IP_IMPORT)[:, inputs.IP].data, dims=1)),
+        village_import = DataFrame(
+            ID               = inputs.VIL,
+            Zone             = [inputs.village_zone[v] for v in inputs.VIL],
+            Total_Import_MWh = vec(sum(VILIMPORTv[:, inputs.VIL].data, dims=1)),
+            Peak_Import_MW   = vec(maximum(VILIMPORTv[:, inputs.VIL].data, dims=1)),
+        )
+    end
+
+    # village grid-connection decision + import/export energy (Grid scenarios only)
+    if solution.VIL_CONNECT == 0
+        village_connection = DataFrame(
+            ID               = inputs.VIL,
+            Zone             = [inputs.village_zone[v] for v in inputs.VIL],
+            Connected        = zeros(Int, length(inputs.VIL)),
+            Total_Import_MWh = zeros(length(inputs.VIL)),
+            Total_Export_MWh = zeros(length(inputs.VIL)),
+        )
+    else
+        CONNECTv = value.(solution.VIL_CONNECT)
+        village_connection = DataFrame(
+            ID               = inputs.VIL,
+            Zone             = [inputs.village_zone[v] for v in inputs.VIL],
+            Connected        = [round(Int, CONNECTv[v]) for v in inputs.VIL],
+            Total_Import_MWh = [sum(VILIMPORTv[:, v].data) for v in inputs.VIL],
+            Total_Export_MWh = [sum(VILEXPORTv[:, v].data) for v in inputs.VIL],
         )
     end
 
@@ -108,37 +134,39 @@ function result_extraction(
         Change_in_Storage_MWh = value.(solution.E_CAP).data .- inputs.generators.Existing_Cap_MW[inputs.STOR],
     )
 
-    ip_storage = DataFrame()
-    try
-        if solution.IP_E_CAP isa AbstractArray
-            total_storage = value.(solution.IP_E_CAP)
-            start_storage = inputs.ip_generators.Existing_Cap_MW[inputs.IP_STOR]
-            change_storage = total_storage .- start_storage
+    village_storage = DataFrame()
+    if !isempty(inputs.VIL_STOR)
+        try
+            if solution.VIL_E_CAP isa AbstractArray
+                total_storage = value.(solution.VIL_E_CAP).data
+                start_storage = inputs.village_generators.Existing_Cap_MW[inputs.VIL_STOR]
+                change_storage = total_storage .- start_storage
 
-            ip_storage = DataFrame(
-                ID                    = inputs.IP_STOR,
-                Zone                  = inputs.ip_generators.Zone[inputs.IP_STOR],
-                Industrial_Park       = inputs.ip_generators.Industrial_Park[inputs.IP_STOR],
-                Resource              = inputs.ip_generators.Resource[inputs.IP_STOR],
-                Total_Storage_MWh     = total_storage,
-                Start_Storage_MWh     = start_storage,
-                Change_in_Storage_MWh = change_storage,
-            )
-        else
-            @warn "solution.IP_E_CAP is not a JuMP container. Using zero-filled values."
-            N = length(inputs.IP_STOR)
-            ip_storage = DataFrame(
-                ID                    = inputs.IP_STOR,
-                Zone                  = inputs.ip_generators.Zone[inputs.IP_STOR],
-                Resource              = inputs.ip_generators.Resource[inputs.IP_STOR],
-                Total_Storage_MWh     = zeros(N),
-                Start_Storage_MWh     = inputs.ip_generators.Existing_Cap_MW[inputs.IP_STOR],
-                Change_in_Storage_MWh = -inputs.ip_generators.Existing_Cap_MW[inputs.IP_STOR],
-            )
+                village_storage = DataFrame(
+                    ID                    = inputs.VIL_STOR,
+                    Zone                  = inputs.village_generators.Zone[inputs.VIL_STOR],
+                    Village       = inputs.village_generators.Village[inputs.VIL_STOR],
+                    Resource              = inputs.village_generators.Resource[inputs.VIL_STOR],
+                    Total_Storage_MWh     = total_storage,
+                    Start_Storage_MWh     = start_storage,
+                    Change_in_Storage_MWh = change_storage,
+                )
+            else
+                @warn "solution.VIL_E_CAP is not a JuMP container. Using zero-filled values."
+                N = length(inputs.VIL_STOR)
+                village_storage = DataFrame(
+                    ID                    = inputs.VIL_STOR,
+                    Zone                  = inputs.village_generators.Zone[inputs.VIL_STOR],
+                    Resource              = inputs.village_generators.Resource[inputs.VIL_STOR],
+                    Total_Storage_MWh     = zeros(N),
+                    Start_Storage_MWh     = inputs.village_generators.Existing_Cap_MW[inputs.VIL_STOR],
+                    Change_in_Storage_MWh = -inputs.village_generators.Existing_Cap_MW[inputs.VIL_STOR],
+                )
+            end
+        catch e
+            @error "Error generating village_storage DataFrame: $e"
+            village_storage = DataFrame()
         end
-    catch e
-        @error "Error generating ip_storage DataFrame: $e"
-        ip_storage = DataFrame()  # Return an empty DataFrame to fail gracefully
     end
 
 
@@ -151,6 +179,14 @@ function result_extraction(
         Change_in_Transfer_Capacity = value.(solution.T_CAP).data .- inputs.lines.Line_Max_Flow_MW,
     )
 
+    FLOWv = value.(solution.FLOW)
+    transmission_flow = DataFrame(
+        ID           = inputs.L,
+        Path         = inputs.lines.path_name[inputs.L],
+        Net_Flow_MWh = [sum(FLOWv[:, l].data) for l in inputs.L],
+        Peak_Flow_MW = [maximum(FLOWv[:, l].data) for l in inputs.L],
+    )
+
     num_s = maximum(inputs.S)
     num_z = maximum(inputs.Z)
     nse_r = DataFrame(
@@ -161,18 +197,19 @@ function result_extraction(
         Total_NSE_MWh         = Float64[],
         NSE_Percent_of_Demand = Float64[]
     )
+    NSEv = value.(solution.NSE)
     for s in inputs.S, z in inputs.Z
         push!(nse_r, (
             s,
             z,
             inputs.nse.NSE_Cost[s],
-            maximum(value.(solution.NSE)[:, s, z].data),
-            sum(value.(solution.NSE)[:, s, z].data),
-            sum(value.(solution.NSE)[:, s, z].data) / total_demand * 100
+            maximum(NSEv[:, s, z].data),
+            sum(NSEv[:, s, z].data),
+            sum(NSEv[:, s, z].data) / total_demand * 100
         ))
     end
 
-    nse_r_ip = DataFrame(
+    nse_r_village = DataFrame(
         Segment               = Int[],
         Zone                  = Int[],
         NSE_Price             = Float64[],
@@ -180,18 +217,19 @@ function result_extraction(
         Total_NSE_MWh         = Float64[],
         NSE_Percent_of_Demand = Float64[]
     )
-    for s in inputs.S, ip in inputs.IP
-        push!(nse_r_ip, (
+    VILNSEv = value.(solution.VIL_NSE)
+    for s in inputs.S, vil in inputs.VIL
+        push!(nse_r_village, (
             s,
-            ip,
+            vil,
             inputs.nse.NSE_Cost[s],
-            maximum(value.(solution.IP_NSE)[:, s, ip].data),
-            sum(value.(solution.IP_NSE)[:, s, ip].data),
-            sum(value.(solution.IP_NSE)[:, s, ip].data) / total_demand * 100
+            maximum(VILNSEv[:, s, vil].data),
+            sum(VILNSEv[:, s, vil].data),
+            sum(VILNSEv[:, s, vil].data) / total_demand * 100
         ))
     end
 
-    nse_heat_ip = DataFrame(
+    nse_heat_village = DataFrame(
         Segment               = Int[],
         Zone                  = Int[],
         NSE_Price             = Float64[],
@@ -199,14 +237,15 @@ function result_extraction(
         Total_NSE_MWh         = Float64[],
         NSE_Percent_of_Demand = Float64[]
     )
-    for s in inputs.S, ip in inputs.IP
-        push!(nse_heat_ip, (
+    VILNSEHEATv = value.(solution.VIL_NSE_HEAT)
+    for s in inputs.S, vil in inputs.VIL
+        push!(nse_heat_village, (
             s,
-            ip,
+            vil,
             inputs.nse.NSE_Cost[s],
-            maximum(value.(solution.IP_NSE_HEAT)[:, s, ip].data),
-            sum(value.(solution.IP_NSE_HEAT)[:, s, ip].data),
-            sum(value.(solution.IP_NSE_HEAT)[:, s, ip].data) / total_demand * 100
+            maximum(VILNSEHEATv[:, s, vil].data),
+            sum(VILNSEHEATv[:, s, vil].data),
+            sum(VILNSEHEATv[:, s, vil].data) / total_demand * 100
         ))
     end
 
@@ -215,51 +254,55 @@ function result_extraction(
         Fixed_Costs_Generation   = value.(solution.FixedCostsGeneration) / 1e6,
         Fixed_Costs_Transmission = value.(solution.FixedCostsTransmission) / 1e6,
         Fixed_Costs_Storage      = value.(solution.FixedCostsStorage) / 1e6,
-        Fixed_Costs_IP           = value.(solution.FixedCostsIPGeneration) / 1e6,
-        Fixed_Costs_IP_Storage   = value.(solution.FixedCostsIPStorage) / 1e6,
+        Fixed_Costs_Village           = value.(solution.FixedCostsVILGeneration) / 1e6,
+        Fixed_Costs_Village_Storage   = value.(solution.FixedCostsVILStorage) / 1e6,
         Variable_Costs_Grid      = value.(solution.VariableCostsGrid) / 1e6,
-        Variable_Costs_IP        = value.(solution.VariableCostsIP) / 1e6,
+        Variable_Costs_Village        = value.(solution.VariableCostsVIL) / 1e6,
         NSE_Costs                = value.(solution.NSECosts) / 1e6,
-        IPNSECosts               = value.(solution.IPNSECosts) / 1e6,
-        IPNSEHeatCosts           = value.(solution.IPNSEHeatCosts) / 1e6,
+        VILNSECosts               = value.(solution.VILNSECosts) / 1e6,
+        VILNSEHeatCosts           = value.(solution.VILNSEHeatCosts) / 1e6,
         Grid_Import_Costs        = value.(solution.GridImportCosts) / 1e6,
         StartCostsGrid           = value.(solution.StartCostsGrid) / 1e6,
-        StartCostsIP             = value.(solution.StartCostsIP) / 1e6
+        StartCostsVIL             = value.(solution.StartCostsVIL) / 1e6
 
     )
 
     clean_energy = DataFrame(
         CO2_Emissions      = value.(solution.CO2Emissions),
         CO2_Emissions_Grid = value.(solution.CO2EmissionsGrid),
-        CO2_Emissions_IP   = value.(solution.CO2EmissionsIP),
+        CO2_Emissions_Village   = value.(solution.CO2EmissionsVIL),
         Grid_REShare       = value.(solution.REShare)
     )
 
     # 11) Write CSVs into the scenario folder
     CSV.write(joinpath(results_dir, "generator_results.csv"),      generator)
-    CSV.write(joinpath(results_dir, "ip_generator_results.csv"),   ip_generators)
-    CSV.write(joinpath(results_dir, "ip_heat_generator_results.csv"), ip_heat_generators)
-    CSV.write(joinpath(results_dir, "ip_import_results.csv"),      ip_import)
+    CSV.write(joinpath(results_dir, "village_generator_results.csv"),   village_generators)
+    CSV.write(joinpath(results_dir, "village_heat_generator_results.csv"), village_heat_generators)
+    CSV.write(joinpath(results_dir, "village_import_results.csv"),      village_import)
+    CSV.write(joinpath(results_dir, "village_connection_results.csv"),  village_connection)
+    CSV.write(joinpath(results_dir, "transmission_flow_results.csv"),   transmission_flow)
     CSV.write(joinpath(results_dir, "storage_results.csv"),        storage)
-    CSV.write(joinpath(results_dir, "ip_storage_results.csv"),     ip_storage)
+    CSV.write(joinpath(results_dir, "village_storage_results.csv"),     village_storage)
     CSV.write(joinpath(results_dir, "transmission_results.csv"),   transmission)
     CSV.write(joinpath(results_dir, "nse_results.csv"),            nse_r)
-    CSV.write(joinpath(results_dir, "ip_nse_results.csv"),         nse_r_ip)
-    CSV.write(joinpath(results_dir, "ip_nse_heat_results.csv"),    nse_heat_ip)
+    CSV.write(joinpath(results_dir, "village_nse_results.csv"),         nse_r_village)
+    CSV.write(joinpath(results_dir, "village_nse_heat_results.csv"),    nse_heat_village)
     CSV.write(joinpath(results_dir, "cost_results.csv"),           cost)
     CSV.write(joinpath(results_dir, "clean_energy_results.csv"),   clean_energy)
 
     return (
         generator_results        = generator,
-        ip_generator_results     = ip_generators,
-        ip_heat_generator_results = ip_heat_generators,
-        ip_import_results        = ip_import,
+        village_generator_results     = village_generators,
+        village_heat_generator_results = village_heat_generators,
+        village_import_results        = village_import,
+        village_connection_results    = village_connection,
+        transmission_flow_results     = transmission_flow,
         storage_results          = storage,
-        ip_storage_results       = ip_storage,
+        village_storage_results       = village_storage,
         transmission_results     = transmission,
         nse_results              = nse_r,
-        ip_nse_results           = nse_r_ip,
-        ip_nse_heat_results      = nse_heat_ip,
+        village_nse_results           = nse_r_village,
+        village_nse_heat_results      = nse_heat_village,
         cost_results             = cost,
         clean_energy             = clean_energy
     )

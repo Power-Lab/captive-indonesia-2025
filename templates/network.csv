@@ -1,0 +1,2 @@
+r_id,path_name,substation_path,z1,z2,voltage_kV,distance_km,B,Line_Max_Flow_MW,Line_Max_Reinforcement_MW,Line_Reinforcement_Cost_per_MWyr
+1,kupang_soe,kupang_soe_70kv,1,-1,70,110,100,20,30,15000
