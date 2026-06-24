@@ -57,15 +57,9 @@ function input_data(filepath)
 
     #Variability
     #read generator capacity factors by hour
-    #the first column of generators_variability.csv is the hour index (r_id), so it is
-    #dropped to line profile column g up with generator R_ID g; generators beyond the
-    #last profile column (e.g. new-build candidates) get a flat 1.0 availability
-    variability = DataFrame(CSV.File(joinpath(filepath, "generators_variability.csv")))[:, 2:end]
-    for g in (ncol(variability)+1):maximum(G)
-        variability[!, Symbol("flat_cf_", g)] .= 1.0
-    end
+    variability = DataFrame(CSV.File(joinpath(filepath, "generators_variability.csv")))
 
-    #Fuel - same data will be used for village generators
+    #Fuel - same data will be used for industrial park generators
     #read fuels data
     fuels = DataFrame(CSV.File(joinpath(filepath, "fuels_data.csv")));
 
@@ -109,20 +103,24 @@ function input_data(filepath)
         generators.CO2_Per_Start[g] = fuels[fuels.Fuel.==generators.Fuel[g],:CO2_content_tons_per_MMBtu][1]*generators.Start_Fuel_MMBTU_per_MW[g]
     end
     
-    #VILLAGES
-    #Village Generators
-    #reading village generator data
-    if isfile(joinpath(filepath, "village_generators.csv"))
-        village_generators = DataFrame(CSV.File(joinpath(filepath, "village_generators.csv")));
+    #INDUSTRIAL PARKS
+    #Industrial Park Generators
+    #reading industrial park generator data
+    if isfile(joinpath(filepath, "ip_generators.csv"))
+        ip_generators = DataFrame(CSV.File(joinpath(filepath, "ip_generators.csv")));
 
     else
-        village_generators = DataFrame(
+        ip_generators = DataFrame(
             R_ID                        = Int[],
             Resource                    = String[],
             Zone                        = String[],
-            Village                     = Int[],
+            Industrial_Park             = Int[],
             technology                  = String[],
-            Existing_Cap_MW             = Float64[],
+            Existing_Cap_MW            = Float64[],
+            commodity                   = String[],
+            plant_owner                 = String[],
+            owner_parent_company        = String[],
+            owner_home_country_flag     = String[],
             Fuel                        = String[],
             Heat_Rate_MMBTU_per_MWh     = Float64[],
             Var_OM_Cost_per_MWh         = Float64[],
@@ -134,111 +132,81 @@ function input_data(filepath)
         )
     end
 
-    #ID for all villages for easy reference
-    VIL = convert(Array{Int64}, unique(collect(skipmissing(village_generators.Village))));
+    #ID for all industrial parks for easy reference
+    IP = convert(Array{Int64}, unique(collect(skipmissing(ip_generators.Industrial_Park))));
 
-    #village generators set
-    VIL_G = village_generators.R_ID;
+    #industrial park generators set
+    IP_G = ip_generators.R_ID;
 
-    #grid zone of each village (taken from its first listed generator), used to
-    #assign village grid imports to the right zone bus
-    village_zone = Dict{Int,Int}()
-    for v in VIL
-        idx = findfirst(x -> !ismissing(x) && x == v, village_generators.Village)
-        village_zone[v] = village_generators.Zone[idx]
-    end
-
-    #per-village grid interconnection cost ($/yr) and capacity cap (MW), read from
-    #village_connection.csv; drives the co-optimised connect-vs-island decision in
-    #optimizer.jl. Missing rows / missing file default to free connection with a
-    #generous cap (i.e. reproduces the prior always-connected behaviour).
-    village_connect_cost = Dict{Int,Float64}()
-    village_connect_max  = Dict{Int,Float64}()
-    if isfile(joinpath(filepath, "village_connection.csv"))
-        vc = DataFrame(CSV.File(joinpath(filepath, "village_connection.csv")))
-        for r in eachrow(vc)
-            village_connect_cost[r.Village] = r.Cost_per_yr
-            village_connect_max[r.Village]  = r.Max_Connect_MW
-        end
-    end
-    for v in VIL
-        get!(village_connect_cost, v, 0.0)
-        get!(village_connect_max, v, 1.0e6)
-    end
-
-    #Village Demand
-    if isfile(joinpath(filepath, "village_demand.csv"))
-        village_demand_input = DataFrame(CSV.File(joinpath(filepath, "village_demand.csv")));
-        #generate column symbols based on VIL indices
-        village_demand_cols = [Symbol("demand_village$i") for i in VIL]
-        village_demand = select(village_demand_input, village_demand_cols...);
+    #Industrial Park Demand
+    if isfile(joinpath(filepath, "ip_demand.csv"))
+        ip_demand_input = DataFrame(CSV.File(joinpath(filepath, "ip_demand.csv")));
+        #generate column symbols based on IP indices
+        ip_demand_cols = [Symbol("demand_ip$i") for i in IP]
+        ip_demand = select(ip_demand_input, ip_demand_cols...);
 
         #set of price responsive demand (non-served energy) segments
-        VIL_S = convert(Array{Int64}, collect(skipmissing(village_demand_input.Demand_Segment)))
+        IP_S = convert(Array{Int64}, collect(skipmissing(ip_demand_input.Demand_Segment)))
 
-        VIL_VOLL = village_demand_input.Voll[1]
+        IP_VOLL = ip_demand_input.Voll[1]
     
         #creating a data frame for nse segments
-        nse_village = DataFrame(Segment = VIL_S, 
-                    NSE_Cost = VIL_VOLL.*collect(skipmissing(village_demand_input.Cost_of_Demand_Curtailment_per_MW)),
-                    NSE_Max = collect(skipmissing(village_demand_input.Max_Demand_Curtailment)))
+        nse_ip = DataFrame(Segment = IP_S, 
+                    NSE_Cost = IP_VOLL.*collect(skipmissing(ip_demand_input.Cost_of_Demand_Curtailment_per_MW)),
+                    NSE_Max = collect(skipmissing(ip_demand_input.Max_Demand_Curtailment)))
     else
-        village_demand = DataFrame(
+        ip_demand = DataFrame(
             r_id = Int[]
         )
 
-        nse_village = DataFrame(
+        nse_ip = DataFrame(
             Segment = Int[],
             NSE_Cost = Float64[],
             NSE_Max = Float64[]
         )
 
-        VIL_S = Int[]
-        VIL_VOLL = 0.0
+        IP_S = Int[]
+        IP_VOLL = 0.0
     end
 
-    if isfile(joinpath(filepath, "village_demandheat.csv"))
-        village_heat_demand_input = DataFrame(CSV.File(joinpath(filepath, "village_demandheat.csv")));
-        # Generate column symbols based on VIL indices
-        village_heat_demand_cols = [Symbol("demand_village$i") for i in VIL]
-        village_demandheat = select(village_heat_demand_input, village_heat_demand_cols...);
+    if isfile(joinpath(filepath, "ip_demandheat.csv"))
+        ip_heat_demand_input = DataFrame(CSV.File(joinpath(filepath, "ip_demandheat.csv")));
+        # Generate column symbols based on IP indices
+        ip_heat_demand_cols = [Symbol("demand_ip$i") for i in IP]
+        ip_demandheat = select(ip_heat_demand_input, ip_heat_demand_cols...);
     else
-        village_demandheat = DataFrame(
+        ip_demandheat = DataFrame(
             r_id = Int[]
         )
     end
 
-    #VIL Variability
-    if isfile(joinpath(filepath, "village_generators_variability.csv"))
-        #read village generator capacity factors by hour, dropping the leading hour
-        #index column so profile column g lines up with village generator R_ID g
-        village_variability = DataFrame(CSV.File(joinpath(filepath, "village_generators_variability.csv")))[:, 2:end]
-        for g in (ncol(village_variability)+1):(isempty(VIL_G) ? 0 : maximum(VIL_G))
-            village_variability[!, Symbol("flat_cf_", g)] .= 1.0
-        end
+    #IP Variability
+    if isfile(joinpath(filepath, "ip_generators_variability.csv"))
+        #read industrial park generator capacity factors by hour
+        ip_variability = DataFrame(CSV.File(joinpath(filepath, "ip_generators_variability.csv")));
     else
-        village_variability = DataFrame(
+        ip_variability = DataFrame(
             r_id = Int[]
         )
     end
 
-    #calculating the associated variable costs for village generators
-    village_generators.Var_Cost = zeros(Float64, size(VIL_G,1))
-    village_generators.CO2_Rate = zeros(Float64, size(VIL_G,1))
-    village_generators.Start_Cost = zeros(Float64, size(VIL_G,1))
-    village_generators.CO2_Per_Start = zeros(Float64, size(VIL_G,1))
+    #calculating the associated variable costs for industrial park generators
+    ip_generators.Var_Cost = zeros(Float64, size(IP_G,1))
+    ip_generators.CO2_Rate = zeros(Float64, size(IP_G,1))
+    ip_generators.Start_Cost = zeros(Float64, size(IP_G,1))
+    ip_generators.CO2_Per_Start = zeros(Float64, size(IP_G,1))
 
-    for g in VIL_G
+    for g in IP_G
         # Variable cost ($/MWh) = variable O&M ($/MWh) + fuel cost ($/MMBtu) * heat rate (MMBtu/MWh)
-        village_generators.Var_Cost[g] = village_generators.Var_OM_Cost_per_MWh[g] +
-            fuels[fuels.Fuel.==village_generators.Fuel[g],:Cost_per_MMBtu][1]*village_generators.Heat_Rate_MMBTU_per_MWh[g]
+        ip_generators.Var_Cost[g] = ip_generators.Var_OM_Cost_per_MWh[g] +
+            fuels[fuels.Fuel.==ip_generators.Fuel[g],:Cost_per_MMBtu][1]*ip_generators.Heat_Rate_MMBTU_per_MWh[g]
         # CO2 emissions rate (tCO2/MWh) = fuel CO2 content (tCO2/MMBtu) * heat rate (MMBtu/MWh)
-        village_generators.CO2_Rate[g] = fuels[fuels.Fuel.==village_generators.Fuel[g],:CO2_content_tons_per_MMBtu][1]*village_generators.Heat_Rate_MMBTU_per_MWh[g]
+        ip_generators.CO2_Rate[g] = fuels[fuels.Fuel.==ip_generators.Fuel[g],:CO2_content_tons_per_MMBtu][1]*ip_generators.Heat_Rate_MMBTU_per_MWh[g]
         # Start-up cost ($/start/MW) = start up O&M cost ($/start/MW) + fuel cost ($/MMBtu) * start up fuel use (MMBtu/start/MW) 
-        village_generators.Start_Cost[g] = village_generators.Start_Cost_per_MW[g] +
-            fuels[fuels.Fuel.==village_generators.Fuel[g],:Cost_per_MMBtu][1]*village_generators.Start_Fuel_MMBTU_per_MW[g]
+        ip_generators.Start_Cost[g] = ip_generators.Start_Cost_per_MW[g] +
+            fuels[fuels.Fuel.==ip_generators.Fuel[g],:Cost_per_MMBtu][1]*ip_generators.Start_Fuel_MMBTU_per_MW[g]
         # Start-up CO2 emissions (tCO2/start/MW) = fuel CO2 content (tCO2/MMBtu) * start up fuel use (MMBtu/start/MW) 
-        village_generators.CO2_Per_Start[g] = fuels[fuels.Fuel.==village_generators.Fuel[g],:CO2_content_tons_per_MMBtu][1]*village_generators.Start_Fuel_MMBTU_per_MW[g]
+        ip_generators.CO2_Per_Start[g] = fuels[fuels.Fuel.==ip_generators.Fuel[g],:CO2_content_tons_per_MMBtu][1]*ip_generators.Start_Fuel_MMBTU_per_MW[g]
     end
     
     #SUBSET DEFINITIONS
@@ -294,35 +262,35 @@ function input_data(filepath)
     # Subset of all other new generators
     ED_NEW = intersect(ED, NEW);
 
-    # subset of VIL generators that are subject to unit commitment constraints
-    VIL_UC = intersect(village_generators.R_ID[village_generators.Commit.==1], VIL_G)
+    # subset of IP generators that are subject to unit commitment constraints
+    IP_UC = intersect(ip_generators.R_ID[ip_generators.Commit.==1], IP_G)
 
-    # subset of VIL generators that are not subject to unit commitment constraints
-    VIL_ED = intersect(village_generators.R_ID[village_generators.Commit.==0], VIL_G)
+    # subset of IP generators that are not subject to unit commitment constraints
+    IP_ED = intersect(ip_generators.R_ID[ip_generators.Commit.==0], IP_G)
 
-    # subset of VIL generators that are RE + storage
-    VIL_RE = intersect(village_generators.R_ID[.!(village_generators.Commit.==1)], VIL_G)
+    # subset of IP generators that are RE + storage
+    IP_RE = intersect(ip_generators.R_ID[.!(ip_generators.Commit.==1)], IP_G)
 
-    # subset of new VIL generators
-    VIL_NEW = intersect(village_generators.R_ID[village_generators.New_Build.==1], VIL_G)
+    # subset of new IP generators
+    IP_NEW = intersect(ip_generators.R_ID[ip_generators.New_Build.==1], IP_G)
 
-    # subset of existing VIL generators
-    VIL_OLD = intersect(village_generators.R_ID[.!(village_generators.New_Build.==1)], VIL_G)
+    # subset of existing IP generators
+    IP_OLD = intersect(ip_generators.R_ID[.!(ip_generators.New_Build.==1)], IP_G)
 
-    #subset of all old VIL UC generators
-    VIL_UC_OLD = intersect(VIL_UC, VIL_OLD)
+    #subset of all old IP UC generators
+    IP_UC_OLD = intersect(IP_UC, IP_OLD)
 
-    #subset of all new VIL UC generators
-    VIL_UC_NEW = intersect(VIL_UC, VIL_NEW)
+    #subset of all new IP UC generators
+    IP_UC_NEW = intersect(IP_UC, IP_NEW)
 
-    #subset of all old VIL ED generators
-    VIL_ED_OLD = intersect(VIL_ED, VIL_OLD)
+    #subset of all old IP ED generators
+    IP_ED_OLD = intersect(IP_ED, IP_OLD)
 
-    #subset of all new VIL ED generators
-    VIL_ED_NEW = intersect(VIL_ED, VIL_NEW)
+    #subset of all new IP ED generators
+    IP_ED_NEW = intersect(IP_ED, IP_NEW)
 
-    #subset of all VIL storage resources
-    VIL_STOR = intersect(village_generators.R_ID[village_generators.STOR.==1], VIL_G)
+    #subset of all IP storage resources
+    IP_STOR = intersect(ip_generators.R_ID[ip_generators.STOR.==1], IP_G)
 
 
     return (
@@ -333,11 +301,11 @@ function input_data(filepath)
         nse = nse,
         hours_per_period = hours_per_period,
         sample_weight = sample_weight,
-        village_generators = village_generators,
-        village_nse = nse_village,
-        village_demand = village_demand,
-        village_demandheat = village_demandheat,
-        village_variability = village_variability,
+        ip_generators = ip_generators,
+        ip_nse = nse_ip,
+        ip_demand = ip_demand,
+        ip_demandheat = ip_demandheat,
+        ip_variability = ip_variability,
         G = G,
         S = S,
         P = P,
@@ -358,22 +326,19 @@ function input_data(filepath)
         UC_NEW = UC_NEW,
         ED_OLD = ED_OLD,
         ED_NEW = ED_NEW,
-        VIL_UC = VIL_UC,
-        VIL_ED = VIL_ED,
-        VIL_NEW = VIL_NEW,
-        VIL_OLD = VIL_OLD,
-        VIL_RE = VIL_RE,
-        VIL = VIL,
-        VIL_G = VIL_G,
-        village_zone = village_zone,
-        village_connect_cost = village_connect_cost,
-        village_connect_max = village_connect_max,
-        VIL_S = VIL_S,
-        VIL_UC_OLD = VIL_UC_OLD,
-        VIL_UC_NEW = VIL_UC_NEW,
-        VIL_ED_OLD = VIL_ED_OLD,
-        VIL_ED_NEW = VIL_ED_NEW,
-        VIL_STOR = VIL_STOR
+        IP_UC = IP_UC,
+        IP_ED = IP_ED,
+        IP_NEW = IP_NEW,
+        IP_OLD = IP_OLD,
+        IP_RE = IP_RE,
+        IP = IP,
+        IP_G = IP_G,
+        IP_S = IP_S,
+        IP_UC_OLD = IP_UC_OLD,
+        IP_UC_NEW = IP_UC_NEW,
+        IP_ED_OLD = IP_ED_OLD,
+        IP_ED_NEW = IP_ED_NEW,
+        IP_STOR = IP_STOR
         )
     
 end

@@ -14,7 +14,7 @@
 # -----
 # - Single island : maluku
 # - Single year   : 2030
-# - Single scenario: base (no grid expansion, no village-side investment)
+# - Single scenario: base (no grid expansion, no captive generation)
 # - Single clean flag: reference (no CO₂ or RE constraints)
 #
 # As a result, generate_jobs.py will create exactly ONE job directory.

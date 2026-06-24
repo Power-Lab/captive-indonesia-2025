@@ -15,8 +15,8 @@ years:
 scenarios:
   - base
   - grid
-  - gridvillage
-  - village
+  - gridcaptive
+  - captive
   - nocoal
   - highimportprice
 
