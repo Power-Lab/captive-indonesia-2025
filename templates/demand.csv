@@ -1,0 +1,2 @@
+Voll,Demand_Segment,Cost_of_Demand_Curtailment_per_MW,Max_Demand_Curtailment,Rep_Periods,Timesteps_per_Rep_Period,Sub_Weights,corresponding_week,r_id,hour,demand_z1,demand_z2
+2000,1,1.0,1.0,8,168,1095,2,1,0,37.4,10.88

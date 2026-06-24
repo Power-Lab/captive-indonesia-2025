@@ -1,0 +1,5 @@
+Fuel,Cost_per_MMBtu,CO2_content_tons_per_MMBtu,fuel_indices
+None,0,0,1
+coal,2.5,0.0975,2
+gas,8.0,0.0531,3
+diesel,18.0,0.0732,4

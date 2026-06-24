@@ -1,0 +1,33 @@
+# scenario_timor_demo.yml
+#
+# Synthetic Timor village-DRE demo (see data_indonesia/2030/timor_demo/README.md).
+#
+# Runs the two scenarios at the heart of the village solar study:
+#   - village     : each village sized standalone (solar + battery + existing
+#                   diesel, no grid interconnection)
+#   - gridvillage : village systems and grid expansion co-optimised, with
+#                   village grid imports allowed
+#
+# The dataset is synthetic — use these runs for testing, training, and
+# demonstrating the workflow, not for policy results.
+
+islands:
+  - timor_demo
+
+years:
+  - "2030"
+
+scenarios:
+  - village
+  - gridvillage
+
+cleans:
+  - reference
+
+# Baseline BAU CO2 emissions (tonnes CO2) — placeholder for clean runs
+island_params:
+  timor_demo: 500000
+
+co2_limits:
+  "2030":
+    timor_demo: 500000
