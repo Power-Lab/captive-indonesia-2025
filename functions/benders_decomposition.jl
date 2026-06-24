@@ -1,6 +1,6 @@
 using JuMP, Gurobi
 
-function benders_master_problem(inputs, mipgap, CO2_constraint, CO2_limit, RE_constraint, RE_limit, Grid, VillageBuild, ImportPrice, NoCoal, CO235reduction, BAUCO2emissions)
+function benders_master_problem(inputs, mipgap, CO2_constraint, CO2_limit, RE_constraint, RE_limit, Grid, Captive, ImportPrice, NoCoal, CO235reduction, BAUCO2emissions)
     
     MASTER = Model(Gurobi.Optimizer)
     set_attribute(MASTER, "MIPGap", mipgap)
@@ -26,15 +26,15 @@ function benders_master_problem(inputs, mipgap, CO2_constraint, CO2_limit, RE_co
         vRET_T_CAP[l in inputs.L] >= 0
         vNEW_T_CAP[l in inputs.L] >= 0
         
-        # Village capacity variables
-        vVIL_CAP[inputs.VIL_G] >= 0
-        vVIL_E_CAP[inputs.VIL_STOR] >= 0
-        vVIL_RET_E_CAP[inputs.VIL_STOR] >= 0
-        vVIL_NEW_E_CAP[inputs.VIL_STOR] >= 0
-        vVIL_RET_CAP_ED[inputs.VIL_ED] >= 0
-        vVIL_NEW_CAP_ED[inputs.VIL_ED] >= 0
-        vVIL_RET_CAP_UC[inputs.VIL_UC] >= 0
-        vVIL_NEW_CAP_UC[inputs.VIL_UC] >= 0
+        # Industrial park capacity variables
+        vIP_CAP[inputs.IP_G] >= 0
+        vIP_E_CAP[inputs.IP_STOR] >= 0
+        vIP_RET_E_CAP[inputs.IP_STOR] >= 0
+        vIP_NEW_E_CAP[inputs.IP_STOR] >= 0
+        vIP_RET_CAP_ED[inputs.IP_ED] >= 0
+        vIP_NEW_CAP_ED[inputs.IP_ED] >= 0
+        vIP_RET_CAP_UC[inputs.IP_UC] >= 0
+        vIP_NEW_CAP_UC[inputs.IP_UC] >= 0
         
         # Benders variables
         η >= 0  # Subproblem cost variable
@@ -74,19 +74,19 @@ function benders_master_problem(inputs, mipgap, CO2_constraint, CO2_limit, RE_co
         # Transmission capacity
         cTransCap[l in inputs.L], vT_CAP[l] == inputs.lines.Line_Max_Flow_MW[l] - vRET_T_CAP[l] + vNEW_T_CAP[l]
         
-        # Village capacity constraints
-        cVILEdOld[g in inputs.VIL_ED_OLD], 
-            vVIL_CAP[g] == inputs.village_generators.Existing_Cap_MW[g] - vVIL_RET_CAP_ED[g]
-        cVILEdNew[g in inputs.VIL_ED_NEW], 
-            vVIL_CAP[g] == vVIL_NEW_CAP_ED[g]
-        cVILUcOld[g in inputs.VIL_UC_OLD], 
-            vVIL_CAP[g] == inputs.village_generators.Existing_Cap_MW[g] - vVIL_RET_CAP_UC[g]
-        cVILUcNew[g in inputs.VIL_UC_NEW], 
-            vVIL_CAP[g] == vVIL_NEW_CAP_UC[g]
-        cVILCapEnergyOld[g in intersect(inputs.VIL_STOR, inputs.VIL_OLD)], 
-            vVIL_E_CAP[g] == inputs.village_generators.Existing_Cap_MWh[g] - vVIL_RET_E_CAP[g]
-        cVILCapEnergyNew[g in intersect(inputs.VIL_STOR, inputs.VIL_NEW)], 
-            vVIL_E_CAP[g] == vVIL_NEW_E_CAP[g]
+        # Industrial park capacity constraints
+        cIPEdOld[g in inputs.IP_ED_OLD], 
+            vIP_CAP[g] == inputs.ip_generators.Existing_Cap_MW[g] - vIP_RET_CAP_ED[g]
+        cIPEdNew[g in inputs.IP_ED_NEW], 
+            vIP_CAP[g] == vIP_NEW_CAP_ED[g]
+        cIPUcOld[g in inputs.IP_UC_OLD], 
+            vIP_CAP[g] == inputs.ip_generators.Existing_Cap_MW[g] - vIP_RET_CAP_UC[g]
+        cIPUcNew[g in inputs.IP_UC_NEW], 
+            vIP_CAP[g] == vIP_NEW_CAP_UC[g]
+        cIPCapEnergyOld[g in intersect(inputs.IP_STOR, inputs.IP_OLD)], 
+            vIP_E_CAP[g] == inputs.ip_generators.Existing_Cap_MWh[g] - vIP_RET_E_CAP[g]
+        cIPCapEnergyNew[g in intersect(inputs.IP_STOR, inputs.IP_NEW)], 
+            vIP_E_CAP[g] == vIP_NEW_E_CAP[g]
     end)
     
     # Fixed cost objective (first-stage costs)
@@ -104,27 +104,27 @@ function benders_master_problem(inputs, mipgap, CO2_constraint, CO2_limit, RE_co
         sum(inputs.lines.Line_Fixed_Cost_per_MW_yr[l]*vT_CAP[l] +
             inputs.lines.Line_Reinforcement_Cost_per_MWyr[l]*vNEW_T_CAP[l] for l in inputs.L) +
         
-        # VIL fixed costs
-        sum(inputs.village_generators.Fixed_OM_Cost_per_MWyr[g]*vVIL_CAP[g] for g in inputs.VIL_G) +
-        sum(inputs.village_generators.Inv_Cost_per_MWyr[g]*vVIL_NEW_CAP_ED[g] for g in inputs.VIL_ED) +
-        sum(inputs.village_generators.Inv_Cost_per_MWyr[g]*vVIL_NEW_CAP_UC[g] for g in inputs.VIL_UC) +
-        sum(inputs.village_generators.Fixed_OM_Cost_per_MWhyr[g]*vVIL_E_CAP[g] for g in inputs.VIL_STOR) +
-        sum(inputs.village_generators.Inv_Cost_per_MWhyr[g]*vVIL_NEW_E_CAP[g] for g in intersect(inputs.VIL_STOR, inputs.VIL_NEW))
+        # IP fixed costs
+        sum(inputs.ip_generators.Fixed_OM_Cost_per_MWyr[g]*vIP_CAP[g] for g in inputs.IP_G) +
+        sum(inputs.ip_generators.Inv_Cost_per_MWyr[g]*vIP_NEW_CAP_ED[g] for g in inputs.IP_ED) +
+        sum(inputs.ip_generators.Inv_Cost_per_MWyr[g]*vIP_NEW_CAP_UC[g] for g in inputs.IP_UC) +
+        sum(inputs.ip_generators.Fixed_OM_Cost_per_MWhyr[g]*vIP_E_CAP[g] for g in inputs.IP_STOR) +
+        sum(inputs.ip_generators.Inv_Cost_per_MWhyr[g]*vIP_NEW_E_CAP[g] for g in intersect(inputs.IP_STOR, inputs.IP_NEW))
     )
     
     @objective(MASTER, Min, eFixedCosts + η)
     
     return MASTER, (
-        vCAP=vCAP, vE_CAP=vE_CAP, vT_CAP=vT_CAP, vVIL_CAP=vVIL_CAP, vVIL_E_CAP=vVIL_E_CAP,
+        vCAP=vCAP, vE_CAP=vE_CAP, vT_CAP=vT_CAP, vIP_CAP=vIP_CAP, vIP_E_CAP=vIP_E_CAP,
         vRET_CAP_ED=vRET_CAP_ED, vNEW_CAP_ED=vNEW_CAP_ED, vRET_CAP_UC=vRET_CAP_UC, vNEW_CAP_UC=vNEW_CAP_UC,
         vRET_E_CAP=vRET_E_CAP, vNEW_E_CAP=vNEW_E_CAP, vRET_T_CAP=vRET_T_CAP, vNEW_T_CAP=vNEW_T_CAP,
-        vVIL_RET_CAP_ED=vVIL_RET_CAP_ED, vVIL_NEW_CAP_ED=vVIL_NEW_CAP_ED, vVIL_RET_CAP_UC=vVIL_RET_CAP_UC, 
-        vVIL_NEW_CAP_UC=vVIL_NEW_CAP_UC, vVIL_RET_E_CAP=vVIL_RET_E_CAP, vVIL_NEW_E_CAP=vVIL_NEW_E_CAP,
+        vIP_RET_CAP_ED=vIP_RET_CAP_ED, vIP_NEW_CAP_ED=vIP_NEW_CAP_ED, vIP_RET_CAP_UC=vIP_RET_CAP_UC, 
+        vIP_NEW_CAP_UC=vIP_NEW_CAP_UC, vIP_RET_E_CAP=vIP_RET_E_CAP, vIP_NEW_E_CAP=vIP_NEW_E_CAP,
         η=η
     )
 end
 
-function benders_subproblem(inputs, capacity_values, Grid, VillageBuild, ImportPrice, NoCoal, CO235reduction, BAUCO2emissions)
+function benders_subproblem(inputs, capacity_values, Grid, Captive, ImportPrice, NoCoal, CO235reduction, BAUCO2emissions)
     
     SUB = Model(Gurobi.Optimizer)
     set_attribute(SUB, "OutputFlag", 0)  # Suppress output for subproblem
@@ -143,20 +143,20 @@ function benders_subproblem(inputs, capacity_values, Grid, VillageBuild, ImportP
         vSHUT[inputs.T, inputs.UC], Bin
         vCOMMIT[inputs.T, inputs.UC], Bin
         
-        # Village operational variables
-        vVIL_GEN[inputs.T, inputs.VIL_G] >= 0
-        vVIL_GEN_HEAT[inputs.T, inputs.VIL_G] >= 0
-        vVIL_SOC[inputs.T, inputs.VIL_STOR] >= 0
-        vVIL_CHARGE[inputs.T, inputs.VIL_STOR] >= 0
-        vVIL_NSE[inputs.T, inputs.S, inputs.VIL] >= 0
-        vVIL_NSE_HEAT[inputs.T, inputs.S, inputs.VIL] >= 0
-        vVIL_COMMIT[inputs.T, inputs.VIL_UC], Bin
-        vVIL_START[inputs.T, inputs.VIL_UC], Bin
-        vVIL_SHUT[inputs.T, inputs.VIL_UC], Bin
+        # Industrial park operational variables
+        vIP_GEN[inputs.T, inputs.IP_G] >= 0
+        vIP_GEN_HEAT[inputs.T, inputs.IP_G] >= 0
+        vIP_SOC[inputs.T, inputs.IP_STOR] >= 0
+        vIP_CHARGE[inputs.T, inputs.IP_STOR] >= 0
+        vIP_NSE[inputs.T, inputs.S, inputs.IP] >= 0
+        vIP_NSE_HEAT[inputs.T, inputs.S, inputs.IP] >= 0
+        vIP_COMMIT[inputs.T, inputs.IP_UC], Bin
+        vIP_START[inputs.T, inputs.IP_UC], Bin
+        vIP_SHUT[inputs.T, inputs.IP_UC], Bin
     end)
     
     if Grid
-        @variable(SUB, vVIL_IMPORT[inputs.T, inputs.VIL] >= 0)
+        @variable(SUB, vIP_IMPORT[inputs.T, inputs.IP] >= 0)
     end
     
     # SUBPROBLEM CONSTRAINTS
@@ -169,7 +169,7 @@ function benders_subproblem(inputs, capacity_values, Grid, VillageBuild, ImportP
             sum(vCHARGE[t,g] for g in intersect(inputs.generators[inputs.generators.Zone.==z,:R_ID],inputs.STOR)) -
             inputs.demand[t,z] - 
             sum(inputs.lines[l,Symbol(string("z",z))] * vFLOW[t,l] for l in inputs.L) -
-            sum(vVIL_IMPORT[t,vil] for vil in inputs.VIL if inputs.village_zone[vil] == z) == 0
+            sum(vIP_IMPORT[t,ip] for ip in intersect(inputs.ip_generators[inputs.ip_generators.Zone.==z,:R_ID],inputs.IP)) == 0
         )
     else
         @constraint(SUB, cDemandBalance[t in inputs.T, z in inputs.Z], 
@@ -275,115 +275,115 @@ function benders_subproblem(inputs, capacity_values, Grid, VillageBuild, ImportP
             capacity_values.vCAP[g] / inputs.generators.Existing_Cap_MW[g] >= sum(vSHUT[tt, g] for tt in intersect(inputs.T, (t-inputs.generators.Down_Time[g]:t)))
     end)
     
-    # Village constraints
+    # Industrial park constraints
     # Heat balance
-    @constraint(SUB, cVILHeatBalance[t in inputs.T, vil in inputs.VIL],
-        sum(vVIL_GEN_HEAT[t,g] for g in intersect(inputs.village_generators[inputs.village_generators.Village.==vil,:R_ID],inputs.VIL_UC)) +
-        sum(vVIL_NSE_HEAT[t,s,vil] for s in inputs.VIL_S) - inputs.village_demandheat[t,vil] == 0
+    @constraint(SUB, cIPHeatBalance[t in inputs.T, ip in inputs.IP],
+        sum(vIP_GEN_HEAT[t,g] for g in intersect(inputs.ip_generators[inputs.ip_generators.Industrial_Park.==ip,:R_ID],inputs.IP_UC)) +
+        sum(vIP_NSE_HEAT[t,s,ip] for s in inputs.IP_S) - inputs.ip_demandheat[t,ip] == 0
     )
     
-    # Electricity balance for villages
+    # Electricity balance for industrial parks
     if Grid
         if NoCoal
-            @constraint(SUB, cVILElectricityBalance[t in inputs.T, vil in inputs.VIL], 
-                sum(vVIL_GEN[t,g] for g in intersect(inputs.village_generators[inputs.village_generators.Village.==vil,:R_ID],union(inputs.VIL_ED, inputs.VIL_STOR))) +
-                sum(vVIL_NSE[t,s,vil] for s in inputs.VIL_S) - sum(vVIL_IMPORT[t,vil]) - inputs.village_demand[t,vil] == 0
+            @constraint(SUB, cIPElectricityBalance[t in inputs.T, ip in inputs.IP], 
+                sum(vIP_GEN[t,g] for g in intersect(inputs.ip_generators[inputs.ip_generators.Industrial_Park.==ip,:R_ID],union(inputs.IP_ED, inputs.IP_STOR))) +
+                sum(vIP_NSE[t,s,ip] for s in inputs.IP_S) - sum(vIP_IMPORT[t,ip]) - inputs.ip_demand[t,ip] == 0
             )
-        elseif VillageBuild
-            @constraint(SUB, cVILElectricityBalance[t in inputs.T, vil in inputs.VIL], 
-                sum(vVIL_GEN[t,g] for g in intersect(inputs.village_generators[inputs.village_generators.Village.==vil,:R_ID],inputs.VIL_G)) +
-                sum(vVIL_NSE[t,s,vil] for s in inputs.VIL_S) - sum(vVIL_IMPORT[t,vil]) - inputs.village_demand[t,vil] == 0
+        elseif Captive
+            @constraint(SUB, cIPElectricityBalance[t in inputs.T, ip in inputs.IP], 
+                sum(vIP_GEN[t,g] for g in intersect(inputs.ip_generators[inputs.ip_generators.Industrial_Park.==ip,:R_ID],inputs.IP_G)) +
+                sum(vIP_NSE[t,s,ip] for s in inputs.IP_S) - sum(vIP_IMPORT[t,ip]) - inputs.ip_demand[t,ip] == 0
             )
         else
-            @constraint(SUB, cVILElectricityBalance[t in inputs.T, vil in inputs.VIL], 
-                sum(vVIL_GEN[t,g] for g in intersect(inputs.village_generators[inputs.village_generators.Village.==vil,:R_ID],inputs.VIL_UC)) +
-                sum(vVIL_NSE[t,s,vil] for s in inputs.VIL_S) - sum(vVIL_IMPORT[t,vil]) - inputs.village_demand[t,vil] == 0
+            @constraint(SUB, cIPElectricityBalance[t in inputs.T, ip in inputs.IP], 
+                sum(vIP_GEN[t,g] for g in intersect(inputs.ip_generators[inputs.ip_generators.Industrial_Park.==ip,:R_ID],inputs.IP_UC)) +
+                sum(vIP_NSE[t,s,ip] for s in inputs.IP_S) - sum(vIP_IMPORT[t,ip]) - inputs.ip_demand[t,ip] == 0
             )
         end
     else
         if NoCoal
-            @constraint(SUB, cVILElectricityBalance[t in inputs.T, vil in inputs.VIL], 
-                sum(vVIL_GEN[t,g] for g in intersect(inputs.village_generators[inputs.village_generators.Village.==vil,:R_ID],union(inputs.VIL_ED, inputs.VIL_STOR))) +
-                sum(vVIL_NSE[t,s,vil] for s in inputs.VIL_S) - inputs.village_demand[t,vil] == 0
+            @constraint(SUB, cIPElectricityBalance[t in inputs.T, ip in inputs.IP], 
+                sum(vIP_GEN[t,g] for g in intersect(inputs.ip_generators[inputs.ip_generators.Industrial_Park.==ip,:R_ID],union(inputs.IP_ED, inputs.IP_STOR))) +
+                sum(vIP_NSE[t,s,ip] for s in inputs.IP_S) - inputs.ip_demand[t,ip] == 0
             )
-        elseif VillageBuild
-            @constraint(SUB, cVILElectricityBalance[t in inputs.T, vil in inputs.VIL], 
-                sum(vVIL_GEN[t,g] for g in intersect(inputs.village_generators[inputs.village_generators.Village.==vil,:R_ID],inputs.VIL_G)) +
-                sum(vVIL_NSE[t,s,vil] for s in inputs.VIL_S) - inputs.village_demand[t,vil] == 0
+        elseif Captive
+            @constraint(SUB, cIPElectricityBalance[t in inputs.T, ip in inputs.IP], 
+                sum(vIP_GEN[t,g] for g in intersect(inputs.ip_generators[inputs.ip_generators.Industrial_Park.==ip,:R_ID],inputs.IP_G)) +
+                sum(vIP_NSE[t,s,ip] for s in inputs.IP_S) - inputs.ip_demand[t,ip] == 0
             )
         else
-            @constraint(SUB, cVILElectricityBalance[t in inputs.T, vil in inputs.VIL], 
-                sum(vVIL_GEN[t,g] for g in intersect(inputs.village_generators[inputs.village_generators.Village.==vil,:R_ID],inputs.VIL_UC)) +
-                sum(vVIL_NSE[t,s,vil] for s in inputs.VIL_S) - inputs.village_demand[t,vil] == 0
+            @constraint(SUB, cIPElectricityBalance[t in inputs.T, ip in inputs.IP], 
+                sum(vIP_GEN[t,g] for g in intersect(inputs.ip_generators[inputs.ip_generators.Industrial_Park.==ip,:R_ID],inputs.IP_UC)) +
+                sum(vIP_NSE[t,s,ip] for s in inputs.IP_S) - inputs.ip_demand[t,ip] == 0
             )
         end
     end
     
-    # Village operational constraints - CORRECTED
+    # Industrial park operational constraints - CORRECTED
     @constraints(SUB, begin
-        # VIL power constraints using fixed capacities
-        cVILEdMaxPower[t in inputs.T, g in inputs.VIL_ED], 
-            vVIL_GEN[t,g] <= inputs.village_variability[t,g] * capacity_values.vVIL_CAP[g]
+        # IP power constraints using fixed capacities
+        cIPEdMaxPower[t in inputs.T, g in inputs.IP_ED], 
+            vIP_GEN[t,g] <= inputs.ip_variability[t,g] * capacity_values.vIP_CAP[g]
         
-        cVILUcMaxPower[t in inputs.T, g in inputs.VIL_UC], 
-            (vVIL_GEN_HEAT[t,g] + vVIL_GEN[t,g]) <= capacity_values.vVIL_CAP[g] * vVIL_COMMIT[t,g]
+        cIPUcMaxPower[t in inputs.T, g in inputs.IP_UC], 
+            (vIP_GEN_HEAT[t,g] + vIP_GEN[t,g]) <= capacity_values.vIP_CAP[g] * vIP_COMMIT[t,g]
         
-        cVILUcMinPower[t in inputs.T, g in inputs.VIL_UC], 
-            (vVIL_GEN[t,g] + vVIL_GEN_HEAT[t,g]) >= inputs.village_generators.Min_Power_MW[g] * capacity_values.vVIL_CAP[g] * vVIL_COMMIT[t,g]
+        cIPUcMinPower[t in inputs.T, g in inputs.IP_UC], 
+            (vIP_GEN[t,g] + vIP_GEN_HEAT[t,g]) >= inputs.ip_generators.Min_Power_MW[g] * capacity_values.vIP_CAP[g] * vIP_COMMIT[t,g]
         
-        # VIL Storage constraints - CORRECTED
-        cVILMaxCharge[t in inputs.T, g in inputs.VIL_STOR], 
-            vVIL_CHARGE[t,g] <= capacity_values.vVIL_CAP[g]
-        # ADDED: VIL storage discharge constraint
-        cVILMaxDischarge[t in inputs.T, g in inputs.VIL_STOR], 
-            vVIL_GEN[t,g] <= capacity_values.vVIL_CAP[g]
-        cVILMaxSOC[t in inputs.T, g in inputs.VIL_STOR], 
-            vVIL_SOC[t,g] <= capacity_values.vVIL_E_CAP[g]
+        # IP Storage constraints - CORRECTED
+        cIPMaxCharge[t in inputs.T, g in inputs.IP_STOR], 
+            vIP_CHARGE[t,g] <= capacity_values.vIP_CAP[g]
+        # ADDED: IP storage discharge constraint
+        cIPMaxDischarge[t in inputs.T, g in inputs.IP_STOR], 
+            vIP_GEN[t,g] <= capacity_values.vIP_CAP[g]
+        cIPMaxSOC[t in inputs.T, g in inputs.IP_STOR], 
+            vIP_SOC[t,g] <= capacity_values.vIP_E_CAP[g]
         
-        # VIL NSE constraints
-        cVILNSE[t in inputs.T, s in inputs.VIL_S, vil in inputs.VIL], 
-            vVIL_NSE[t,s,vil] <= inputs.village_nse.NSE_Max[s] * inputs.village_demand[t,vil]
-        cVILNSEHeat[t in inputs.T, s in inputs.VIL_S, vil in inputs.VIL], 
-            vVIL_NSE_HEAT[t,s,vil] <= inputs.village_nse.NSE_Max[s] * inputs.village_demandheat[t,vil]
+        # IP NSE constraints
+        cIPNSE[t in inputs.T, s in inputs.IP_S, ip in inputs.IP], 
+            vIP_NSE[t,s,ip] <= inputs.ip_nse.NSE_Max[s] * inputs.ip_demand[t,ip]
+        cIPNSEHeat[t in inputs.T, s in inputs.IP_S, ip in inputs.IP], 
+            vIP_NSE_HEAT[t,s,ip] <= inputs.ip_nse.NSE_Max[s] * inputs.ip_demandheat[t,ip]
         
-        # VIL storage state of charge
-        cVILSOC[t in inputs.INTERIOR, g in inputs.VIL_STOR],
-            vVIL_SOC[t,g] == vVIL_SOC[t-1,g] + inputs.village_generators.Eff_Up[g]*vVIL_CHARGE[t,g] - vVIL_GEN[t,g]/inputs.village_generators.Eff_Down[g]
-        cVILSOCWrap[t in inputs.START, g in inputs.VIL_STOR],
-            vVIL_SOC[t,g] == vVIL_SOC[t+inputs.hours_per_period-1,g] + inputs.village_generators.Eff_Up[g]*vVIL_CHARGE[t,g] - vVIL_GEN[t,g]/inputs.village_generators.Eff_Down[g]
+        # IP storage state of charge
+        cIPSOC[t in inputs.INTERIOR, g in inputs.IP_STOR],
+            vIP_SOC[t,g] == vIP_SOC[t-1,g] + inputs.ip_generators.Eff_Up[g]*vIP_CHARGE[t,g] - vIP_GEN[t,g]/inputs.ip_generators.Eff_Down[g]
+        cIPSOCWrap[t in inputs.START, g in inputs.IP_STOR],
+            vIP_SOC[t,g] == vIP_SOC[t+inputs.hours_per_period-1,g] + inputs.ip_generators.Eff_Up[g]*vIP_CHARGE[t,g] - vIP_GEN[t,g]/inputs.ip_generators.Eff_Down[g]
         
-        # VIL unit commitment constraints
-        cVILCommitBound[t in inputs.T, g in inputs.VIL_UC],
-            vVIL_COMMIT[t,g] <= capacity_values.vVIL_CAP[g] / inputs.village_generators.Existing_Cap_MW[g]
-        cVILStartBound[t in inputs.T, g in inputs.VIL_UC],
-            vVIL_START[t,g] <= capacity_values.vVIL_CAP[g] / inputs.village_generators.Existing_Cap_MW[g]
-        cVILShutBound[t in inputs.T, g in inputs.VIL_UC],
-            vVIL_SHUT[t,g] <= capacity_values.vVIL_CAP[g] / inputs.village_generators.Existing_Cap_MW[g]
-        cVILCommitState[t in inputs.T_red, g in inputs.VIL_UC],
-            vVIL_COMMIT[t+1,g] == vVIL_COMMIT[t,g] + vVIL_START[t+1,g] - vVIL_SHUT[t+1,g]
+        # IP unit commitment constraints
+        cIPCommitBound[t in inputs.T, g in inputs.IP_UC],
+            vIP_COMMIT[t,g] <= capacity_values.vIP_CAP[g] / inputs.ip_generators.Existing_Cap_MW[g]
+        cIPStartBound[t in inputs.T, g in inputs.IP_UC],
+            vIP_START[t,g] <= capacity_values.vIP_CAP[g] / inputs.ip_generators.Existing_Cap_MW[g]
+        cIPShutBound[t in inputs.T, g in inputs.IP_UC],
+            vIP_SHUT[t,g] <= capacity_values.vIP_CAP[g] / inputs.ip_generators.Existing_Cap_MW[g]
+        cIPCommitState[t in inputs.T_red, g in inputs.IP_UC],
+            vIP_COMMIT[t+1,g] == vIP_COMMIT[t,g] + vIP_START[t+1,g] - vIP_SHUT[t+1,g]
         
-        # VIL ramp constraints - CORRECTED
-        cVILRampUp[t in inputs.INTERIOR, g in inputs.VIL_ED],
-            vVIL_GEN[t,g] - vVIL_GEN[t-1,g] <= inputs.village_generators.Ramp_Up_Percentage[g] * capacity_values.vVIL_CAP[g]
-        cVILRampUpWrap[t in inputs.START, g in inputs.VIL_ED],
-            vVIL_GEN[t,g] - vVIL_GEN[t+inputs.hours_per_period-1,g] <= inputs.village_generators.Ramp_Up_Percentage[g] * capacity_values.vVIL_CAP[g]
-        cVILRampDown[t in inputs.INTERIOR, g in inputs.VIL_ED],
-            vVIL_GEN[t-1,g] - vVIL_GEN[t,g] <= inputs.village_generators.Ramp_Dn_Percentage[g] * capacity_values.vVIL_CAP[g]
-        cVILRampDownWrap[t in inputs.START, g in inputs.VIL_ED],
-            vVIL_GEN[t+inputs.hours_per_period-1,g] - vVIL_GEN[t,g] <= inputs.village_generators.Ramp_Dn_Percentage[g] * capacity_values.vVIL_CAP[g]
+        # IP ramp constraints - CORRECTED
+        cIPRampUp[t in inputs.INTERIOR, g in inputs.IP_ED],
+            vIP_GEN[t,g] - vIP_GEN[t-1,g] <= inputs.ip_generators.Ramp_Up_Percentage[g] * capacity_values.vIP_CAP[g]
+        cIPRampUpWrap[t in inputs.START, g in inputs.IP_ED],
+            vIP_GEN[t,g] - vIP_GEN[t+inputs.hours_per_period-1,g] <= inputs.ip_generators.Ramp_Up_Percentage[g] * capacity_values.vIP_CAP[g]
+        cIPRampDown[t in inputs.INTERIOR, g in inputs.IP_ED],
+            vIP_GEN[t-1,g] - vIP_GEN[t,g] <= inputs.ip_generators.Ramp_Dn_Percentage[g] * capacity_values.vIP_CAP[g]
+        cIPRampDownWrap[t in inputs.START, g in inputs.IP_ED],
+            vIP_GEN[t+inputs.hours_per_period-1,g] - vIP_GEN[t,g] <= inputs.ip_generators.Ramp_Dn_Percentage[g] * capacity_values.vIP_CAP[g]
         
-        # VIL UC ramp constraints
-        cVILRampUpUC[t in inputs.INTERIOR, g in inputs.VIL_UC],
-            (vVIL_GEN[t,g] + vVIL_GEN_HEAT[t,g]) - (vVIL_GEN[t-1,g] + vVIL_GEN_HEAT[t-1,g]) <= 
-            inputs.village_generators.Ramp_Up_Percentage[g] * capacity_values.vVIL_CAP[g] * (vVIL_COMMIT[t,g] - vVIL_START[t,g]) +
-            max(inputs.village_generators.Min_Power_MW[g], inputs.village_generators.Ramp_Up_Percentage[g]) * capacity_values.vVIL_CAP[g] * vVIL_START[t,g] - 
-            inputs.village_generators.Min_Power_MW[g] * capacity_values.vVIL_CAP[g] * vVIL_SHUT[t,g]
+        # IP UC ramp constraints
+        cIPRampUpUC[t in inputs.INTERIOR, g in inputs.IP_UC],
+            (vIP_GEN[t,g] + vIP_GEN_HEAT[t,g]) - (vIP_GEN[t-1,g] + vIP_GEN_HEAT[t-1,g]) <= 
+            inputs.ip_generators.Ramp_Up_Percentage[g] * capacity_values.vIP_CAP[g] * (vIP_COMMIT[t,g] - vIP_START[t,g]) +
+            max(inputs.ip_generators.Min_Power_MW[g], inputs.ip_generators.Ramp_Up_Percentage[g]) * capacity_values.vIP_CAP[g] * vIP_START[t,g] - 
+            inputs.ip_generators.Min_Power_MW[g] * capacity_values.vIP_CAP[g] * vIP_SHUT[t,g]
         
-        # VIL min up/down time constraints
-        cVILUpTime[t in inputs.T, g in inputs.VIL_UC],
-            vVIL_COMMIT[t,g] >= sum(vVIL_START[tt,g] for tt in intersect(inputs.T, (t-inputs.village_generators.Up_Time[g]:t)))
-        cVILDownTime[t in inputs.T, g in inputs.VIL_UC],
-            capacity_values.vVIL_CAP[g] / inputs.village_generators.Existing_Cap_MW[g] >= sum(vVIL_SHUT[tt,g] for tt in intersect(inputs.T, (t-inputs.village_generators.Down_Time[g]:t)))
+        # IP min up/down time constraints
+        cIPUpTime[t in inputs.T, g in inputs.IP_UC],
+            vIP_COMMIT[t,g] >= sum(vIP_START[tt,g] for tt in intersect(inputs.T, (t-inputs.ip_generators.Up_Time[g]:t)))
+        cIPDownTime[t in inputs.T, g in inputs.IP_UC],
+            capacity_values.vIP_CAP[g] / inputs.ip_generators.Existing_Cap_MW[g] >= sum(vIP_SHUT[tt,g] for tt in intersect(inputs.T, (t-inputs.ip_generators.Down_Time[g]:t)))
     end)
     
     # Variable cost objective (second-stage costs)
@@ -394,20 +394,20 @@ function benders_subproblem(inputs, capacity_values, Grid, VillageBuild, ImportP
         sum(inputs.sample_weight[t]*inputs.generators.Start_Cost[g]*vSTART[t,g]*capacity_values.vCAP[g] for t in inputs.T, g in inputs.UC) +
         # NSE costs
         sum(inputs.sample_weight[t]*inputs.nse.NSE_Cost[s]*vNSE[t,s,z] for t in inputs.T, s in inputs.S, z in inputs.Z) +
-        # VIL generation costs
-        sum(inputs.sample_weight[t]*inputs.village_generators.Var_Cost[g]*vVIL_GEN[t,g] for t in inputs.T, g in inputs.VIL_ED) +
-        sum(inputs.sample_weight[t]*inputs.village_generators.Var_Cost[g]*(vVIL_GEN[t,g] + vVIL_GEN_HEAT[t,g]) for t in inputs.T, g in inputs.VIL_UC) +
-        # VIL start costs
-        sum(inputs.sample_weight[t]*inputs.village_generators.Start_Cost[g]*vVIL_START[t,g]*capacity_values.vVIL_CAP[g] for t in inputs.T, g in inputs.VIL_UC) +
-        # VIL NSE costs
-        sum(inputs.sample_weight[t]*inputs.village_nse.NSE_Cost[s]*vVIL_NSE[t,s,vil] for t in inputs.T, s in inputs.S, vil in inputs.VIL) +
-        sum(inputs.sample_weight[t]*inputs.village_nse.NSE_Cost[s]*vVIL_NSE_HEAT[t,s,vil] for t in inputs.T, s in inputs.S, vil in inputs.VIL)
+        # IP generation costs
+        sum(inputs.sample_weight[t]*inputs.ip_generators.Var_Cost[g]*vIP_GEN[t,g] for t in inputs.T, g in inputs.IP_ED) +
+        sum(inputs.sample_weight[t]*inputs.ip_generators.Var_Cost[g]*(vIP_GEN[t,g] + vIP_GEN_HEAT[t,g]) for t in inputs.T, g in inputs.IP_UC) +
+        # IP start costs
+        sum(inputs.sample_weight[t]*inputs.ip_generators.Start_Cost[g]*vIP_START[t,g]*capacity_values.vIP_CAP[g] for t in inputs.T, g in inputs.IP_UC) +
+        # IP NSE costs
+        sum(inputs.sample_weight[t]*inputs.ip_nse.NSE_Cost[s]*vIP_NSE[t,s,ip] for t in inputs.T, s in inputs.S, ip in inputs.IP) +
+        sum(inputs.sample_weight[t]*inputs.ip_nse.NSE_Cost[s]*vIP_NSE_HEAT[t,s,ip] for t in inputs.T, s in inputs.S, ip in inputs.IP)
     )
     
     # Add grid import costs if applicable
     if Grid
         @expression(SUB, eGridImportCosts,
-            sum(inputs.sample_weight[t]*ImportPrice*vVIL_IMPORT[t,vil] for t in inputs.T, vil in inputs.VIL)
+            sum(inputs.sample_weight[t]*ImportPrice*vIP_IMPORT[t,ip] for t in inputs.T, ip in inputs.IP)
         )
         @objective(SUB, Min, eVariableCosts + eGridImportCosts)
     else
@@ -417,16 +417,16 @@ function benders_subproblem(inputs, capacity_values, Grid, VillageBuild, ImportP
     return SUB, (
         vGEN=vGEN, vCHARGE=vCHARGE, vSOC=vSOC, vNSE=vNSE, vFLOW=vFLOW,
         vSTART=vSTART, vSHUT=vSHUT, vCOMMIT=vCOMMIT,
-        vVIL_GEN=vVIL_GEN, vVIL_GEN_HEAT=vVIL_GEN_HEAT, vVIL_SOC=vVIL_SOC, vVIL_CHARGE=vVIL_CHARGE,
-        vVIL_NSE=vVIL_NSE, vVIL_NSE_HEAT=vVIL_NSE_HEAT, vVIL_COMMIT=vVIL_COMMIT, vVIL_START=vVIL_START, vVIL_SHUT=vVIL_SHUT,
-        vVIL_IMPORT=Grid ? vVIL_IMPORT : nothing
+        vIP_GEN=vIP_GEN, vIP_GEN_HEAT=vIP_GEN_HEAT, vIP_SOC=vIP_SOC, vIP_CHARGE=vIP_CHARGE,
+        vIP_NSE=vIP_NSE, vIP_NSE_HEAT=vIP_NSE_HEAT, vIP_COMMIT=vIP_COMMIT, vIP_START=vIP_START, vIP_SHUT=vIP_SHUT,
+        vIP_IMPORT=Grid ? vIP_IMPORT : nothing
     )
 end
 
-function solve_benders_decomposition(inputs, mipgap, CO2_constraint, CO2_limit, RE_constraint, RE_limit, Grid, VillageBuild, ImportPrice, NoCoal, CO235reduction, BAUCO2emissions; max_iter=100, tolerance=1e-6)
+function solve_benders_decomposition(inputs, mipgap, CO2_constraint, CO2_limit, RE_constraint, RE_limit, Grid, Captive, ImportPrice, NoCoal, CO235reduction, BAUCO2emissions; max_iter=100, tolerance=1e-6)
     
     # Initialize
-    master_model, master_vars = benders_master_problem(inputs, mipgap, CO2_constraint, CO2_limit, RE_constraint, RE_limit, Grid, VillageBuild, ImportPrice, NoCoal, CO235reduction, BAUCO2emissions)
+    master_model, master_vars = benders_master_problem(inputs, mipgap, CO2_constraint, CO2_limit, RE_constraint, RE_limit, Grid, Captive, ImportPrice, NoCoal, CO235reduction, BAUCO2emissions)
     
     upper_bound = Inf
     lower_bound = -Inf
@@ -453,12 +453,12 @@ function solve_benders_decomposition(inputs, mipgap, CO2_constraint, CO2_limit, 
             vCAP = value.(master_vars.vCAP),
             vE_CAP = value.(master_vars.vE_CAP),
             vT_CAP = value.(master_vars.vT_CAP),
-            vVIL_CAP = value.(master_vars.vVIL_CAP),
-            vVIL_E_CAP = value.(master_vars.vVIL_E_CAP)
+            vIP_CAP = value.(master_vars.vIP_CAP),
+            vIP_E_CAP = value.(master_vars.vIP_E_CAP)
         )
         
         # Solve subproblem
-        sub_model, sub_vars = benders_subproblem(inputs, capacity_values, Grid, VillageBuild, ImportPrice, NoCoal, CO235reduction, BAUCO2emissions)
+        sub_model, sub_vars = benders_subproblem(inputs, capacity_values, Grid, Captive, ImportPrice, NoCoal, CO235reduction, BAUCO2emissions)
         optimize!(sub_model)
         
         if termination_status(sub_model) != MOI.OPTIMAL
@@ -502,8 +502,8 @@ function solve_benders_decomposition(inputs, mipgap, CO2_constraint, CO2_limit, 
         vCAP = value.(master_vars.vCAP),
         vE_CAP = value.(master_vars.vE_CAP),
         vT_CAP = value.(master_vars.vT_CAP),
-        vVIL_CAP = value.(master_vars.vVIL_CAP),
-        vVIL_E_CAP = value.(master_vars.vVIL_E_CAP),
+        vIP_CAP = value.(master_vars.vIP_CAP),
+        vIP_E_CAP = value.(master_vars.vIP_E_CAP),
         vRET_CAP_ED = value.(master_vars.vRET_CAP_ED),
         vNEW_CAP_ED = value.(master_vars.vNEW_CAP_ED),
         vRET_CAP_UC = value.(master_vars.vRET_CAP_UC),
@@ -512,12 +512,12 @@ function solve_benders_decomposition(inputs, mipgap, CO2_constraint, CO2_limit, 
         vNEW_E_CAP = value.(master_vars.vNEW_E_CAP),
         vRET_T_CAP = value.(master_vars.vRET_T_CAP),
         vNEW_T_CAP = value.(master_vars.vNEW_T_CAP),
-        vVIL_RET_CAP_ED = value.(master_vars.vVIL_RET_CAP_ED),
-        vVIL_NEW_CAP_ED = value.(master_vars.vVIL_NEW_CAP_ED),
-        vVIL_RET_CAP_UC = value.(master_vars.vVIL_RET_CAP_UC),
-        vVIL_NEW_CAP_UC = value.(master_vars.vVIL_NEW_CAP_UC),
-        vVIL_RET_E_CAP = value.(master_vars.vVIL_RET_E_CAP),
-        vVIL_NEW_E_CAP = value.(master_vars.vVIL_NEW_E_CAP)
+        vIP_RET_CAP_ED = value.(master_vars.vIP_RET_CAP_ED),
+        vIP_NEW_CAP_ED = value.(master_vars.vIP_NEW_CAP_ED),
+        vIP_RET_CAP_UC = value.(master_vars.vIP_RET_CAP_UC),
+        vIP_NEW_CAP_UC = value.(master_vars.vIP_NEW_CAP_UC),
+        vIP_RET_E_CAP = value.(master_vars.vIP_RET_E_CAP),
+        vIP_NEW_E_CAP = value.(master_vars.vIP_NEW_E_CAP)
     )
     
     return (
@@ -532,23 +532,27 @@ function solve_benders_decomposition(inputs, mipgap, CO2_constraint, CO2_limit, 
 end
 
 # Wrapper function that mimics the original capacity_expansion interface
-function capacity_expansion_benders(inputs, mipgap, CO2_constraint, CO2_limit, RE_constraint, RE_limit, Grid, VillageBuild, ImportPrice, NoCoal, CO235reduction, BAUCO2emissions)
+function capacity_expansion_benders(inputs, mipgap, CO2_constraint, CO2_limit, RE_constraint, RE_limit, Grid, Captive, ImportPrice, NoCoal, CO235reduction, BAUCO2emissions)
     
-    result = solve_benders_decomposition(inputs, mipgap, CO2_constraint, CO2_limit, RE_constraint, RE_limit, Grid, VillageBuild, ImportPrice, NoCoal, CO235reduction, BAUCO2emissions)
+    result = solve_benders_decomposition(inputs, mipgap, CO2_constraint, CO2_limit, RE_constraint, RE_limit, Grid, Captive, ImportPrice, NoCoal, CO235reduction, BAUCO2emissions)
     
     # Solve final subproblem to get operational variables
-    final_sub_model, final_sub_vars = benders_subproblem(inputs, result.capacity_values, Grid, VillageBuild, ImportPrice, NoCoal, CO235reduction, BAUCO2emissions)
+    final_sub_model, final_sub_vars = benders_subproblem(inputs, result.capacity_values, Grid, Captive, ImportPrice, NoCoal, CO235reduction, BAUCO2emissions)
     optimize!(final_sub_model)
     
     # Extract results in the same format as original function
     if Grid
-        VIL_IMPORT = value.(final_sub_vars.vVIL_IMPORT)
+        IP_IMPORT = value.(final_sub_vars.vIP_IMPORT)
     else
-        VIL_IMPORT = 0
+        IP_IMPORT = 0
     end
     
-    VIL_E_CAP = result.capacity_values.vVIL_E_CAP
-
+    if Captive
+        IP_E_CAP = 0
+    else
+        IP_E_CAP = result.capacity_values.vIP_E_CAP
+    end
+    
     # Calculate expressions for compatibility
     eFixedCostsGeneration = sum(inputs.generators.Fixed_OM_Cost_per_MWyr[g]*result.capacity_values.vCAP[g] for g in inputs.G) +
                            sum(inputs.generators.Inv_Cost_per_MWyr[g]*result.capacity_values.vNEW_CAP_ED[g] for g in inputs.ED_NEW) +
@@ -561,43 +565,43 @@ function capacity_expansion_benders(inputs, mipgap, CO2_constraint, CO2_limit, R
                                  inputs.lines.Line_Reinforcement_Cost_per_MWyr[l]*result.capacity_values.vNEW_T_CAP[l] for l in inputs.L)
     
     # Calculate operational costs from subproblem
-    eVariableCostsGrid = objective_value(final_sub_model) - (Grid ? sum(inputs.sample_weight[t]*ImportPrice*value(final_sub_vars.vVIL_IMPORT[t,vil]) for t in inputs.T, vil in inputs.VIL) : 0)
+    eVariableCostsGrid = objective_value(final_sub_model) - (Grid ? sum(inputs.sample_weight[t]*ImportPrice*value(final_sub_vars.vIP_IMPORT[t,ip]) for t in inputs.T, ip in inputs.IP) : 0)
     
     # Placeholder values for other expressions - would need to be calculated properly
     eCO2EmissionsGrid = 0  # Calculate from generators
-    eCO2EmissionsVIL = 0    # Calculate from VIL generators
+    eCO2EmissionsIP = 0    # Calculate from IP generators
     eREShare = 0           # Calculate renewable share
     eNSECosts = 0          # Calculate NSE costs
-    eVILNSECosts = 0        # Calculate VIL NSE costs
-    eVILNSEHeatCosts = 0    # Calculate VIL NSE heat costs
-    eGridImportCosts = Grid ? sum(inputs.sample_weight[t]*ImportPrice*value(final_sub_vars.vVIL_IMPORT[t,vil]) for t in inputs.T, vil in inputs.VIL) : 0
+    eIPNSECosts = 0        # Calculate IP NSE costs
+    eIPNSEHeatCosts = 0    # Calculate IP NSE heat costs
+    eGridImportCosts = Grid ? sum(inputs.sample_weight[t]*ImportPrice*value(final_sub_vars.vIP_IMPORT[t,ip]) for t in inputs.T, ip in inputs.IP) : 0
     
     return (
         CAP = result.capacity_values.vCAP,
         GEN = value.(final_sub_vars.vGEN),
         E_CAP = result.capacity_values.vE_CAP,
-        VIL_CAP = result.capacity_values.vVIL_CAP,
-        VIL_E_CAP = VIL_E_CAP,
-        VIL_GEN = value.(final_sub_vars.vVIL_GEN),
-        VIL_GEN_HEAT = value.(final_sub_vars.vVIL_GEN_HEAT),
-        VIL_IMPORT = VIL_IMPORT,
+        IP_CAP = result.capacity_values.vIP_CAP,
+        IP_E_CAP = IP_E_CAP,
+        IP_GEN = value.(final_sub_vars.vIP_GEN),
+        IP_GEN_HEAT = value.(final_sub_vars.vIP_GEN_HEAT),
+        IP_IMPORT = IP_IMPORT,
         T_CAP = result.capacity_values.vT_CAP,
         NSE = value.(final_sub_vars.vNSE),
-        VIL_NSE = value.(final_sub_vars.vVIL_NSE),
-        VIL_NSE_HEAT = value.(final_sub_vars.vVIL_NSE_HEAT),
+        IP_NSE = value.(final_sub_vars.vIP_NSE),
+        IP_NSE_HEAT = value.(final_sub_vars.vIP_NSE_HEAT),
         FixedCostsGeneration = eFixedCostsGeneration,
         FixedCostsStorage = eFixedCostsStorage,
         FixedCostsTransmission = eFixedCostsTransmission,
         VariableCostsGrid = eVariableCostsGrid,
-        VariableCostsVIL = 0,  # Would need to be calculated
+        VariableCostsIP = 0,  # Would need to be calculated
         GridImportCosts = eGridImportCosts,
-        CO2Emissions = eCO2EmissionsGrid + eCO2EmissionsVIL,
+        CO2Emissions = eCO2EmissionsGrid + eCO2EmissionsIP,
         CO2EmissionsGrid = eCO2EmissionsGrid,
-        CO2EmissionsVIL = eCO2EmissionsVIL,
+        CO2EmissionsIP = eCO2EmissionsIP,
         REShare = eREShare,
         NSECosts = eNSECosts,
-        VILNSECosts = eVILNSECosts,
-        VILNSEHeatCosts = eVILNSEHeatCosts,
+        IPNSECosts = eIPNSECosts,
+        IPNSEHeatCosts = eIPNSEHeatCosts,
         cost = result.total_cost
     )
 end 

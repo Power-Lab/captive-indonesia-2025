@@ -453,21 +453,21 @@ function capacity_expansion(inputs, mipgap, CO2_constraint, CO2_limit, RE_constr
                 vIP_GEN[t,g] - vIP_GEN[t+inputs.hours_per_period-1,g]  <= 
                 inputs.ip_generators.Ramp_Up_Percentage[g]*vIP_CAP[g]
 
-            #ramp up constraints for UC units, normal
-            cIPRampUpUC[t in inputs.INTERIOR, g in inputs.IP_UC],
-                (vIP_GEN[t,g] + vIP_GEN_HEAT[t,g]) - (vIP_GEN[t-1,g] + vIP_GEN_HEAT[t-1,g]) <= 
-                inputs.ip_generators.Ramp_Up_Percentage[g]*inputs.ip_generators.Existing_Cap_MW[g]*(vIP_COMMIT[t,g] - vIP_START[t,g]) +
-                max(inputs.ip_generators.Min_Power_MW[g], 
-                inputs.ip_generators.Ramp_Up_Percentage[g])*inputs.ip_generators.Existing_Cap_MW[g]*vIP_START[t,g] - 
-                inputs.ip_generators.Min_Power_MW[g]*inputs.ip_generators.Existing_Cap_MW[g]*vIP_SHUT[t,g]
+            # #ramp up constraints for UC units, normal
+            # cIPRampUpUC[t in inputs.INTERIOR, g in inputs.IP_UC],
+            #     (vIP_GEN[t,g] + vIP_GEN_HEAT[t,g]) - (vIP_GEN[t-1,g] + vIP_GEN_HEAT[t-1,g]) <= 
+            #     inputs.ip_generators.Ramp_Up_Percentage[g]*inputs.ip_generators.Existing_Cap_MW[g]*(vIP_COMMIT[t,g] - vIP_START[t,g]) +
+            #     max(inputs.ip_generators.Min_Power_MW[g], 
+            #     inputs.ip_generators.Ramp_Up_Percentage[g])*inputs.ip_generators.Existing_Cap_MW[g]*vIP_START[t,g] - 
+            #     inputs.ip_generators.Min_Power_MW[g]*inputs.ip_generators.Existing_Cap_MW[g]*vIP_SHUT[t,g]
 
-            #ramp up constraints for UC units, sub-period wrapping
-            cIPRampUpWrapUC[t in inputs.START, g in inputs.IP_UC],    
-                (vIP_GEN[t,g] + vIP_GEN_HEAT[t,g]) - (vIP_GEN[t+inputs.hours_per_period-1,g] + vIP_GEN_HEAT[t+inputs.hours_per_period-1,g]) <= 
-                inputs.ip_generators.Ramp_Up_Percentage[g]*inputs.ip_generators.Existing_Cap_MW[g]*(vIP_COMMIT[t,g] - vIP_START[t,g]) +
-                max(inputs.ip_generators.Min_Power_MW[g], 
-                inputs.ip_generators.Ramp_Up_Percentage[g])*inputs.ip_generators.Existing_Cap_MW[g]*vIP_START[t,g] - 
-                inputs.ip_generators.Min_Power_MW[g]*inputs.ip_generators.Existing_Cap_MW[g]*vIP_SHUT[t,g]
+            # #ramp up constraints for UC units, sub-period wrapping
+            # cIPRampUpWrapUC[t in inputs.START, g in inputs.IP_UC],    
+            #     (vIP_GEN[t,g] + vIP_GEN_HEAT[t,g]) - (vIP_GEN[t+inputs.hours_per_period-1,g] + vIP_GEN_HEAT[t+inputs.hours_per_period-1,g]) <= 
+            #     inputs.ip_generators.Ramp_Up_Percentage[g]*inputs.ip_generators.Existing_Cap_MW[g]*(vIP_COMMIT[t,g] - vIP_START[t,g]) +
+            #     max(inputs.ip_generators.Min_Power_MW[g], 
+            #     inputs.ip_generators.Ramp_Up_Percentage[g])*inputs.ip_generators.Existing_Cap_MW[g]*vIP_START[t,g] - 
+            #     inputs.ip_generators.Min_Power_MW[g]*inputs.ip_generators.Existing_Cap_MW[g]*vIP_SHUT[t,g]
 
             #ramp down for ED units, normal
             cIPRampDown[t in inputs.INTERIOR, g in inputs.IP_ED],
@@ -477,21 +477,21 @@ function capacity_expansion(inputs, mipgap, CO2_constraint, CO2_limit, RE_constr
             cIPRampDownWrap[t in inputs.START, g in inputs.IP_ED],
                 vIP_GEN[t+inputs.hours_per_period-1,g] - vIP_GEN[t,g] <= inputs.ip_generators.Ramp_Dn_Percentage[g]*vIP_CAP[g]
 
-            #ramp down constraints for UC units, normal
-            cIPRampDownUC[t in inputs.INTERIOR, g in inputs.IP_UC],
-                (vIP_GEN[t-1,g] + vIP_GEN_HEAT[t-1,g]) - (vIP_GEN[t,g] + vIP_GEN_HEAT[t,g]) <= 
-                inputs.ip_generators.Ramp_Dn_Percentage[g]*inputs.ip_generators.Existing_Cap_MW[g]*(vIP_COMMIT[t,g] - vIP_START[t,g]) +
-                max(inputs.ip_generators.Min_Power_MW[g], 
-                inputs.ip_generators.Ramp_Dn_Percentage[g])*inputs.ip_generators.Existing_Cap_MW[g]*vIP_SHUT[t,g] - 
-                inputs.ip_generators.Min_Power_MW[g]*inputs.ip_generators.Existing_Cap_MW[g]*vIP_START[t,g]
+            # #ramp down constraints for UC units, normal
+            # cIPRampDownUC[t in inputs.INTERIOR, g in inputs.IP_UC],
+            #     (vIP_GEN[t-1,g] + vIP_GEN_HEAT[t-1,g]) - (vIP_GEN[t,g] + vIP_GEN_HEAT[t,g]) <= 
+            #     inputs.ip_generators.Ramp_Dn_Percentage[g]*inputs.ip_generators.Existing_Cap_MW[g]*(vIP_COMMIT[t,g] - vIP_START[t,g]) +
+            #     max(inputs.ip_generators.Min_Power_MW[g], 
+            #     inputs.ip_generators.Ramp_Dn_Percentage[g])*inputs.ip_generators.Existing_Cap_MW[g]*vIP_SHUT[t,g] - 
+            #     inputs.ip_generators.Min_Power_MW[g]*inputs.ip_generators.Existing_Cap_MW[g]*vIP_START[t,g]
 
-            #ramp down constraints for UC units, sub-period wrapping
-            cIPRampDownWrapUC[t in inputs.START, g in inputs.IP_UC],    
-                (vIP_GEN[t+inputs.hours_per_period-1,g] + vIP_GEN_HEAT[t+inputs.hours_per_period-1,g]) - (vIP_GEN[t,g] + vIP_GEN_HEAT[t,g]) <= 
-                inputs.ip_generators.Ramp_Dn_Percentage[g]*inputs.ip_generators.Existing_Cap_MW[g]*(vIP_COMMIT[t,g] - vIP_START[t,g]) +
-                max(inputs.ip_generators.Min_Power_MW[g], 
-                inputs.ip_generators.Ramp_Dn_Percentage[g])*inputs.ip_generators.Existing_Cap_MW[g]*vIP_SHUT[t,g] - 
-                inputs.ip_generators.Min_Power_MW[g]*inputs.ip_generators.Existing_Cap_MW[g]*vIP_START[t,g]
+            # #ramp down constraints for UC units, sub-period wrapping
+            # cIPRampDownWrapUC[t in inputs.START, g in inputs.IP_UC],    
+            #     (vIP_GEN[t+inputs.hours_per_period-1,g] + vIP_GEN_HEAT[t+inputs.hours_per_period-1,g]) - (vIP_GEN[t,g] + vIP_GEN_HEAT[t,g]) <= 
+            #     inputs.ip_generators.Ramp_Dn_Percentage[g]*inputs.ip_generators.Existing_Cap_MW[g]*(vIP_COMMIT[t,g] - vIP_START[t,g]) +
+            #     max(inputs.ip_generators.Min_Power_MW[g], 
+            #     inputs.ip_generators.Ramp_Dn_Percentage[g])*inputs.ip_generators.Existing_Cap_MW[g]*vIP_SHUT[t,g] - 
+            #     inputs.ip_generators.Min_Power_MW[g]*inputs.ip_generators.Existing_Cap_MW[g]*vIP_START[t,g]
                 
             #minimum up constraints
             cIPUpTime[t in inputs.T, g in inputs.IP_UC],
