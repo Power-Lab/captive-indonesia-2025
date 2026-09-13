@@ -76,11 +76,13 @@ def build_configs(data, solver_override=None):
 @click.command()
 @click.option('--scenarios-file', '-s',
               type=click.Path(exists=True),
-              default='scenarios.yml',
-              help='YAML with islands, years, scenarios, cleans, island_params, co2_limits.')
+              required=True,
+              help='YAML with islands, years, scenarios, cleans, island_params, co2_limits '
+                   '(e.g. scenario_maluku_test.yml).')
 @click.option('--run-script', '-r',
               type=click.Path(exists=True),
-              default='run_model.jl',
+              default=str(Path(__file__).resolve().parent / 'run_model.jl'),
+              show_default='run_model.jl next to this script',
               help='Path to the Julia entry point (run_model.jl).')
 @click.option('--output-root', '-o',
               type=click.Path(),

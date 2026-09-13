@@ -14,9 +14,12 @@
 
 set -euo pipefail
 
-# The repository root is the folder that holds run_model.jl. Because this file
-# is a symlink into the job folder, resolving the link finds it.
-REPO_ROOT="${CAPTIVE_REPO_ROOT:-$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)}"
+# The repository root is the folder that holds run_model.jl. generate_jobs.py
+# --submit exports it as CAPTIVE_REPO_ROOT (sbatch runs a spool copy of this
+# script, so its own path is no guide). When submitting by hand from a job
+# folder, jobs/<job_name>/ sits two levels below the repository root.
+REPO_ROOT="${CAPTIVE_REPO_ROOT:-$(cd "${SLURM_SUBMIT_DIR:-$PWD}/../.." && pwd)}"
+[ -f "$REPO_ROOT/run_model.jl" ] || { echo "run_model.jl not found under $REPO_ROOT; set CAPTIVE_REPO_ROOT" >&2; exit 1; }
 
 # module load julia                         # cluster-specific
 # export GRB_LICENSE_FILE=/path/to/gurobi.lic   # only for "solver": "gurobi"

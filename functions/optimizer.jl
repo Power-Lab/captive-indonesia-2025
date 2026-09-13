@@ -730,11 +730,9 @@ function capacity_expansion(inputs, mipgap, CO2_constraint, CO2_limit, RE_constr
         IP_IMPORT = 0
     end
 
-    if Captive
-        IP_E_CAP = 0
-    else
-        IP_E_CAP = vIP_E_CAP
-    end
+    # industrial-park storage energy capacity is always a model variable; it used to
+    # be replaced by 0 in captive runs, which zero-filled ip_storage_results.csv
+    IP_E_CAP = vIP_E_CAP
     
     return (
         CAP = vCAP,
@@ -772,6 +770,7 @@ function capacity_expansion(inputs, mipgap, CO2_constraint, CO2_limit, RE_constr
         solve_time_s = solve_time(CE),
         relative_gap = gap,
         solver_name = solver_name(CE),
+        solver_version = (try string(MOI.get(backend(CE), MOI.SolverVersion())) catch; "unknown" end),
         relax_uc = relax_uc
         )
 

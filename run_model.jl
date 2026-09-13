@@ -33,7 +33,8 @@ include(joinpath(REPO_ROOT, "functions", "function_compiler.jl"))
 # 1) Command line and solver choice. Gurobi is imported only when requested so
 #    that an open-source set-up never needs it.
 cli    = parse_cli_args(ARGS)
-solver = lowercase(strip(something(cli.solver, get(JSON.parsefile(cli.config_path), "solver", "highs"))))
+cfg0   = load_config(cli.config_path)   # friendly errors for a missing file or missing keys
+solver = lowercase(strip(String(something(cli.solver, get(cfg0, "solver", nothing), "highs"))))
 solver == "gurobi" && @eval using Gurobi
 
 # 2) Validate the config, the input folder and the solver before building anything
@@ -76,9 +77,41 @@ end
 
 mkpath(pre.results_dir)
 
-# 5) Solve and write results
+function git_commit(root)
+    try
+        strip(read(pipeline(`git -C $(root) rev-parse --short HEAD`; stderr = devnull), String))
+    catch
+        nothing
+    end
+end
+function git_dirty(root)
+    try
+        !isempty(strip(read(pipeline(`git -C $(root) status --porcelain --untracked-files=no`; stderr = devnull), String)))
+    catch
+        nothing
+    end
+end
+# record the config location relative to the repository (basename if outside it) so
+# that run_info.json never contains machine-specific absolute paths
+config_label(path, root) = startswith(path, root) ? relpath(path, root) : basename(path)
+
+# 5) Solve and write results. If the solve fails (infeasible, no incumbent within
+#    the time limit, solver error) a run_info.json with the error is still written
+#    so batch runs keep a record of what happened.
 wall_t0 = time()
-solution = function_compiler(
+function write_failure_record(err)
+    open(joinpath(pre.results_dir, "run_info.json"), "w") do io
+        JSON.print(io, Dict(
+            "job_name" => pre.job_name, "config_file" => config_label(cli.config_path, REPO_ROOT),
+            "solver_requested" => solver, "julia_version" => string(VERSION),
+            "git_commit" => git_commit(REPO_ROOT), "git_uncommitted_changes" => git_dirty(REPO_ROOT),
+            "termination_status" => "FAILED", "error" => sprint(showerror, err),
+            "wall_time_s" => round(time() - wall_t0; digits = 1),
+            "finished_at" => string(Libc.strftime("%Y-%m-%dT%H:%M:%S", time()))), 2)
+    end
+end
+solution = try
+    function_compiler(
     pre.inputs_path,
     pre.results_dir,
     mipgap,
@@ -95,35 +128,27 @@ solution = function_compiler(
     solver = solver,
     relax_uc = relax_uc,
     time_limit = time_limit
-)
+    )
+catch err
+    write_failure_record(err)
+    println("Run failed: $(sprint(showerror, err))")
+    println("A run_info.json describing the failure was written to $(pre.results_dir)")
+    exit(1)
+end
 wall_s = time() - wall_t0
 
 # 6) Record how this run was produced next to its results
-function git_commit(root)
-    try
-        strip(read(pipeline(`git -C $(root) rev-parse --short HEAD`; stderr = devnull), String))
-    catch
-        nothing
-    end
-end
-function git_dirty(root)
-    try
-        !isempty(strip(read(pipeline(`git -C $(root) status --porcelain --untracked-files=no`; stderr = devnull), String)))
-    catch
-        nothing
-    end
-end
 jsonnum(x) = (x isa AbstractFloat && !isfinite(x)) ? nothing : x
-# record the config location relative to the repository (basename if outside it) so
-# that run_info.json never contains machine-specific absolute paths
-config_label(path, root) = startswith(path, root) ? relpath(path, root) : basename(path)
 solver_pkg = solver == "gurobi" ? Gurobi : HiGHS
+cfg_effective = copy(cfg)
+cfg_effective["solver"] = solver            # the solver actually used (--solver overrides the file)
 run_info = Dict(
     "job_name"             => pre.job_name,
     "config_file"          => config_label(cli.config_path, REPO_ROOT),
-    "config"               => cfg,
+    "config"               => cfg_effective,
     "solver"               => solution.solver_name,
-    "solver_package_version" => string(pkgversion(solver_pkg)),
+    "solver_version"       => solution.solver_version,                 # solver library
+    "solver_package_version" => string(pkgversion(solver_pkg)),        # Julia wrapper (HiGHS.jl / Gurobi.jl)
     "jump_version"         => string(pkgversion(JuMP)),
     "julia_version"        => string(VERSION),
     "platform"             => "$(Sys.KERNEL) $(Sys.ARCH), $(Sys.CPU_THREADS) threads",

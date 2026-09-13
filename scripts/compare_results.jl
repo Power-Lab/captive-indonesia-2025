@@ -40,6 +40,16 @@ run_dir, ref_dir, tol = parse_args(ARGS)
 for d in (run_dir, ref_dir)
     isdir(d) || error("folder not found: $(d)")
 end
+const REQUIRED_FILES = ("generator_results.csv", "cost_results.csv", "clean_energy_results.csv", "nse_results.csv", "storage_results.csv")
+let missing = [(d, f) for d in (run_dir, ref_dir) for f in REQUIRED_FILES if !isfile(joinpath(d, f))]
+    if !isempty(missing)
+        for (d, f) in missing
+            println("  FAIL missing $(f) in $(d)")
+        end
+        println("COMPARE_FAIL: $(length(missing)) required file(s) missing")
+        exit(1)
+    end
+end
 readcsv(d, f) = CSV.read(joinpath(d, f), DataFrame)
 
 fails = 0
@@ -85,11 +95,6 @@ println("Capacity (MW) and generation over the representative weeks (GWh) by tec
 println("-" ^ 110)
 show(stdout, select(t, :technology, :run_MW, :ref_MW, :run_GWh, :ref_GWh); allrows = true, allcols = true, summary = false, eltypes = false)
 println()
-
-# files every run must produce
-for f in ("generator_results.csv", "cost_results.csv", "clean_energy_results.csv", "nse_results.csv", "storage_results.csv")
-    isfile(joinpath(run_dir, f)) || (global fails += 1; println("  FAIL missing output $(f)"))
-end
 
 println()
 if fails == 0

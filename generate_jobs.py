@@ -69,11 +69,13 @@ def build_configs(data, solver_override=None):
 @click.command()
 @click.option('--scenarios-file', '-s',
               type=click.Path(exists=True),
-              default='scenarios.yml',
-              help='YAML with islands, years, scenarios, cleans, island_params, co2_limits.')
+              required=True,
+              help='YAML with islands, years, scenarios, cleans, island_params, co2_limits '
+                   '(e.g. scenario_maluku_test.yml).')
 @click.option('--submit-script', '-b',
               type=click.Path(exists=True),
-              default='submit_template.sb',
+              default=str(Path(__file__).resolve().parent / 'submit_template.sb'),
+              show_default='submit_template.sb next to this script',
               help='SLURM submission script to symlink into every job folder.')
 @click.option('--output-root', '-o',
               type=click.Path(),
@@ -90,6 +92,9 @@ def main(scenarios_file, submit_script, output_root, solver, submit):
     data = yaml.safe_load(Path(scenarios_file).read_text())
     jobs_root = Path(output_root)
     jobs_root.mkdir(parents=True, exist_ok=True)
+    # sbatch copies the batch script into its spool directory, so the template
+    # cannot locate the repository from its own path; pass it explicitly.
+    repo_root = Path(__file__).resolve().parent
 
     total = 0
     for name, cfg in build_configs(data, solver.lower() if solver else None):
@@ -109,7 +114,9 @@ def main(scenarios_file, submit_script, output_root, solver, submit):
 
         click.echo(f"Prepared job '{name}' (code '{job_code}', solver {cfg.get('solver', 'highs')})")
         if submit:
-            subprocess.run(["sbatch", "--job-name", job_code, sb_link.name], cwd=job_dir, check=True)
+            subprocess.run(["sbatch", "--job-name", job_code,
+                            f"--export=ALL,CAPTIVE_REPO_ROOT={repo_root}", sb_link.name],
+                           cwd=job_dir, check=True)
             click.echo(f"  Submitted as SLURM job '{job_code}'")
         total += 1
 

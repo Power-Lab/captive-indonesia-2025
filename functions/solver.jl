@@ -55,6 +55,11 @@ function validate_solver(solver::AbstractString)
         optimize!(model)
         termination_status(model) == MOI.OPTIMAL ||
             error("test model finished with status $(termination_status(model))")
+        # release the test model's solver environment now rather than at the next GC
+        # (a Gurobi environment holds a licence token)
+        MOI.empty!(backend(model))
+        model = nothing
+        GC.gc()
     catch err
         error("Solver \"$(solver)\" could not start a working optimizer session: " *
               sprint(showerror, err))

@@ -31,20 +31,25 @@ Produced on an Apple Silicon laptop with Julia 1.12 and the package versions in
 machine can stop at a different near-optimal plan; the comparison checks
 headline metrics with tolerances (see `scripts/compare_results.jl`).
 
-| Metric | `expected_results/` (Gurobi, exact) | HiGHS, exact (observed) | `expected_results_relaxed/` (HiGHS, LP) |
+| Metric | `expected_results/` (Gurobi 13.0, exact) | HiGHS 1.15, exact (observed) | `expected_results_relaxed/` (HiGHS 1.15, LP) |
 |--------|------:|------:|------:|
-| Total system cost (million USD/yr) | 68.31 | 68.11 | 67.59 |
-| CO₂ emissions (tCO₂/yr) | 690,071 | 690,381 | 700,153 |
+| Total system cost (million USD/yr) | 68.31 | 68.16 | 67.59 |
+| CO₂ emissions (tCO₂/yr) | 690,071 | 686,908 | 700,153 |
 | Grid renewable share | 69.5 % | 69.5 % | 69.2 % |
-| Non-served energy (share of demand) | 0.017 % | 0.036 % | 0.032 % |
-| Achieved MIP gap | 1.00 % | 0.76 % | LP |
-| Solver time | 36 s | 813 s | 83 s |
+| Non-served energy (share of demand) | 0.017 % | 0.017 % | 0.032 % |
+| Achieved MIP gap | 1.00 % | 0.83 % | LP |
+| Solver time | 39 s | 813 s | 83 s |
 
 The exact plans agree on the fleet: all existing diesel, gas and coal units are
-kept, and about 66 MW of new solar is built. Gurobi's solution adds a 12 MW
-battery; HiGHS's does not, and instead accepts a little more non-served energy
-in the price-responsive demand segments, which is why its cost is 0.3 % lower at
-a smaller gap. Both are valid solutions within the 1 % MIP gap the study used.
+kept, no storage energy is built, and 66 to 67 MW of new solar is added. The
+HiGHS plan is 0.2 % cheaper with slightly more solar and 0.5 % lower emissions;
+both are valid solutions within the 1 % MIP gap the study used.
+
+One quirk to be aware of when reading `generator_results.csv`: the Maluku
+inputs give `battery_candidate` a zero cost per MW of power capacity (its cost
+is per MWh of energy), so the solver may report a non-zero `Total_MW` for it
+even when `storage_results.csv` shows 0 MWh built. That power capacity is free
+and unused, not a battery investment.
 
 ## Regenerating the reference outputs
 

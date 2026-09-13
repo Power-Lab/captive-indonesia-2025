@@ -9,7 +9,15 @@ const REPO_ROOT = @__DIR__
 
 println("Activating the Julia environment at $(REPO_ROOT)")
 Pkg.activate(REPO_ROOT)
-Pkg.instantiate()
+try
+    Pkg.instantiate()
+catch err
+    println()
+    println("Pkg.instantiate() failed. Manifest.toml was resolved with Julia 1.12; on Julia $(VERSION) run")
+    println("    julia --project=. -e 'using Pkg; Pkg.resolve(); Pkg.instantiate()'")
+    println("(this re-resolves the package versions for your Julia) and then re-run bootstrap.jl.")
+    rethrow(err)
+end
 
 using JuMP
 using HiGHS

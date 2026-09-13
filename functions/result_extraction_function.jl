@@ -104,8 +104,8 @@ function result_extraction(
         Zone                  = inputs.generators.Zone[inputs.STOR],
         Resource              = inputs.generators.Resource[inputs.STOR],
         Total_Storage_MWh     = value.(solution.E_CAP).data,
-        Start_Storage_MWh     = inputs.generators.Existing_Cap_MW[inputs.STOR],
-        Change_in_Storage_MWh = value.(solution.E_CAP).data .- inputs.generators.Existing_Cap_MW[inputs.STOR],
+        Start_Storage_MWh     = inputs.generators.Existing_Cap_MWh[inputs.STOR],
+        Change_in_Storage_MWh = value.(solution.E_CAP).data .- inputs.generators.Existing_Cap_MWh[inputs.STOR],
     )
 
     ip_storage = DataFrame()
@@ -123,7 +123,7 @@ function result_extraction(
             )
         elseif solution.IP_E_CAP isa AbstractArray
             total_storage = value.(solution.IP_E_CAP)
-            start_storage = inputs.ip_generators.Existing_Cap_MW[inputs.IP_STOR]
+            start_storage = inputs.ip_generators.Existing_Cap_MWh[inputs.IP_STOR]
             change_storage = total_storage .- start_storage
 
             ip_storage = DataFrame(
@@ -143,8 +143,8 @@ function result_extraction(
                 Zone                  = inputs.ip_generators.Zone[inputs.IP_STOR],
                 Resource              = inputs.ip_generators.Resource[inputs.IP_STOR],
                 Total_Storage_MWh     = zeros(N),
-                Start_Storage_MWh     = inputs.ip_generators.Existing_Cap_MW[inputs.IP_STOR],
-                Change_in_Storage_MWh = -inputs.ip_generators.Existing_Cap_MW[inputs.IP_STOR],
+                Start_Storage_MWh     = inputs.ip_generators.Existing_Cap_MWh[inputs.IP_STOR],
+                Change_in_Storage_MWh = -inputs.ip_generators.Existing_Cap_MWh[inputs.IP_STOR],
             )
         end
     catch e

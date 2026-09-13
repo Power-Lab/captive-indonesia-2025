@@ -21,8 +21,9 @@ fmt(x; d = 1) = x isa Number ? (isfinite(x) ? string(round(x; digits = d)) : "n/
     technology_table(gen)
 
 Capacity and generation by technology. `Start_MW` in generator_results.csv is
-the existing capacity for existing units and the maximum buildable size for
-new-build candidates (New_Build == 1), so the two are separated here.
+the Existing_Cap_MW input: existing capacity for existing units, but only the
+nominal unit size of a new-build candidate (New_Build == 1), so the two are
+separated here and candidates count only through what was actually built.
 """
 function technology_table(gen::DataFrame)
     existing = gen[gen.New_Build .!= 1, :]
@@ -102,7 +103,39 @@ println("-" ^ 78)
 show(stdout, tech; allrows = true, allcols = true, summary = false, eltypes = false)
 println()
 
-out = joinpath(DIR, "summary_by_technology.csv")
-CSV.write(out, tech)
-println()
-println("Wrote $(out)")
+# industrial parks (captive scenarios on islands with ip_* inputs)
+ipg = isfile(joinpath(DIR, "ip_generator_results.csv")) ? readcsv("ip_generator_results.csv") : nothing
+if ipg !== nothing && nrow(ipg) > 0
+    ipt = combine(groupby(ipg, :technology), :Total_MW => sum => :Total_MW, :Electricity_GWh => sum => :Electricity_GWh_rep_weeks)
+    if isfile(joinpath(DIR, "ip_heat_generator_results.csv"))
+        iph = readcsv("ip_heat_generator_results.csv")
+        nrow(iph) > 0 && (ipt = leftjoin(ipt, combine(groupby(iph, :technology), :GWh => sum => :Heat_GWh_rep_weeks), on = :technology))
+    end
+    for c in names(ipt, Real)
+        ipt[!, c] = round.(coalesce.(ipt[!, c], 0.0); digits = 2)
+    end
+    println()
+    println("Industrial parks: on-site capacity and generation by technology")
+    println("-" ^ 78)
+    show(stdout, sort(ipt, :Total_MW, rev = true); allrows = true, allcols = true, summary = false, eltypes = false)
+    println()
+    if isfile(joinpath(DIR, "ip_import_results.csv"))
+        ipi = readcsv("ip_import_results.csv")
+        nrow(ipi) > 0 && @printf("  %-44s %14.1f\n", "Grid imports by industrial parks (MWh, rep. weeks)", sum(ipi.Total_Import_MWh))
+    end
+    if isfile(joinpath(DIR, "ip_storage_results.csv"))
+        ips = readcsv("ip_storage_results.csv")
+        nrow(ips) > 0 && @printf("  %-44s %14.1f\n", "Industrial-park storage energy capacity (MWh)", sum(ips.Total_Storage_MWh))
+    end
+end
+
+# write the table next to the CSVs, except into the git-tracked reference folders
+if startswith(DIR, joinpath(normpath(joinpath(@__DIR__, "..")), "test_case"))
+    println()
+    println("(summary_by_technology.csv not written: $(DIR) is a shipped reference folder)")
+else
+    out = joinpath(DIR, "summary_by_technology.csv")
+    CSV.write(out, tech)
+    println()
+    println("Wrote $(out)")
+end

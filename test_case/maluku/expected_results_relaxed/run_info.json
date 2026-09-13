@@ -1,0 +1,32 @@
+{
+  "config": {
+    "island": "maluku",
+    "year": "2030",
+    "scenario": "base",
+    "clean": "reference",
+    "CO235reduction": false,
+    "BAUCO2emissions": 0.0,
+    "CO2_limit": 5820000,
+    "solver": "highs",
+    "mipgap": 0.01,
+    "relax_uc": true,
+    "run_tag": "relaxed_ref"
+  },
+  "config_file": "/private/tmp/claude-501/-Users-kaarthigeswaranagnapathy-Documents-GitHub-captive-indonesia-2025/84c120a4-2c85-4ef0-ae1b-f7f74608d681/scratchpad/config_relaxed_ref.json",
+  "finished_at": "2026-09-13T00:26:52",
+  "git_commit": "2e3d4d7",
+  "job_name": "base_maluku_2030_reference__relaxed_ref",
+  "julia_version": "1.12.5",
+  "jump_version": "1.31.2",
+  "mipgap": 0.01,
+  "objective_usd_per_yr": 6.758680130255616e7,
+  "platform": "Darwin aarch64, 10 threads",
+  "relative_gap": 6.39375834176722e-15,
+  "relax_uc": true,
+  "solve_time_s": 82.62942100013606,
+  "solver": "HiGHS",
+  "solver_package_version": "1.25.2",
+  "termination_status": "OPTIMAL",
+  "time_limit_s": 259200.0,
+  "wall_time_s": 106.0
+}

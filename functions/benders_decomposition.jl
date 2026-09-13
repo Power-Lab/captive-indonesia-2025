@@ -128,7 +128,10 @@ end
 
 function benders_subproblem(inputs, capacity_values, Grid, Captive, ImportPrice, NoCoal, CO235reduction, BAUCO2emissions; solver::AbstractString = "highs")
     
-    SUB = make_solver(solver; silent = true)  # suppress solver output for the subproblem
+    # silent subproblem. Note: make_solver applies the same settings as the main
+    # model (for Gurobi: Crossover = 0 and the 3-day limit), which the original
+    # Gurobi-only version of this subproblem did not set.
+    SUB = make_solver(solver; silent = true)
     
     # SUBPROBLEM VARIABLES (Operational Decisions)
     @variables(SUB, begin

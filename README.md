@@ -17,13 +17,13 @@ This section is for reviewers and anyone who wants to check that the code runs a
 | Set | Size | Where it runs | Solver | Status |
 |-----|------|---------------|--------|--------|
 | Maluku 2030, `base` scenario, `reference` case | 1 job; 214k binaries, 0.8M constraints | a laptop | HiGHS (no licence) or Gurobi | **run it yourself**, see below |
-| Full study (8 islands × 6 scenarios × 2 cases × 2 years, `scenario_2030_example.yml`) | 96 jobs per year; the large islands are multi-zone MILPs that take hours to days each | HPC cluster | Gurobi | reproducible from the same inputs and code with `generate_jobs.py`; not practical on a laptop |
+| Full study: 8 islands × 6 scenarios × 2 cases, for 2030 (`scenario_2030_example.yml`) and 2035 (add `"2035"` to its `years`; the 2035 CO₂ limits are already in the file) | 96 jobs per year; the large islands are multi-zone MILPs that take hours to days each | HPC cluster | Gurobi | reproducible from the same inputs and code with `generate_jobs.py`; not practical on a laptop |
 
-All input data for every island and year is in `data_indonesia/`, and the scenario files that define the published run set are in the repository root, so the full study can be regenerated on a cluster with the commands in [Batch runs](#batch-runs).
+All input data for every island and year is in `data_indonesia/`, and the scenario files that define the published run set are in the repository root, so the full study can be regenerated on a cluster with the commands in [Batch runs](#batch-runs). The outputs of those runs are not archived in this repository; only the Maluku reference outputs are.
 
 **Run the Maluku test case** (about 15 minutes on a recent laptop with HiGHS)
 
-1. Install [Julia](https://julialang.org/downloads/) 1.10 or newer, ideally through [juliaup](https://github.com/JuliaLang/juliaup). Nothing else is needed.
+1. Install [Julia](https://julialang.org/downloads/) 1.12, ideally through [juliaup](https://github.com/JuliaLang/juliaup) (`juliaup add 1.12`). The package manifest was resolved with 1.12 and CI tests 1.12; other 1.x versions should work after `Pkg.resolve()` (see Troubleshooting). Nothing else is needed.
 2. From the repository root, install the pinned packages once:
    ```bash
    julia bootstrap.jl
@@ -32,7 +32,7 @@ All input data for every island and year is in `data_indonesia/`, and the scenar
    ```bash
    julia --project=. test_case/run_maluku_test.jl
    ```
-   The last line is `MALUKU_TEST_PASSED` or `MALUKU_TEST_FAILED`. Results are written to `results/base_maluku_2030_reference__test_exact/`, including `run_info.json` (solver, package versions, git commit, MIP gap, solve time) and `summary_by_technology.csv`.
+   The last line is `MALUKU_TEST_PASSED` or `MALUKU_TEST_FAILED`. Results are written to `results/base_maluku_2030_reference__test_exact_highs/` (one folder per mode and solver), including the effective `config.json`, `run_info.json` (solver and package versions, git commit, MIP gap, solve time) and `summary_by_technology.csv`.
 
 Variants:
 
@@ -43,15 +43,15 @@ julia --project=. test_case/run_maluku_test.jl --quick           # LP relaxation
 
 **What to expect.** The reference outputs in `test_case/maluku/expected_results/` were produced with Gurobi, the solver used for the article. The model is solved to a 1 % MIP gap, so a different solver (or a different machine) legitimately lands on a different near-optimal plan; the comparison therefore checks headline metrics against tolerances rather than requiring identical CSVs. Observed values on an Apple Silicon laptop:
 
-| Metric | Reference (Gurobi 13, exact MILP) | HiGHS 1.25, exact MILP | Comparison tolerance |
+| Metric | Reference (Gurobi 13.0, exact MILP) | HiGHS 1.15, exact MILP | Comparison tolerance |
 |--------|------:|------:|------|
-| Total system cost (million USD/yr) | 68.31 | 68.11 | 2 % relative |
-| CO₂ emissions (tCO₂/yr) | 690,071 | 690,381 | 5 % relative |
+| Total system cost (million USD/yr) | 68.31 | 68.16 | 2 % relative |
+| CO₂ emissions (tCO₂/yr) | 690,071 | 686,908 | 5 % relative |
 | Grid renewable share | 69.5 % | 69.5 % | 3 percentage points |
-| Non-served energy (share of demand) | 0.017 % | 0.036 % | 0.1 percentage points |
-| New solar / battery built (MW) | 66.1 / 12.0 | 66.0 / 0.0 | information only |
-| Achieved MIP gap | 1.00 % | 0.76 % | |
-| Solver time | 36 s | 813 s | |
+| Non-served energy (share of demand) | 0.017 % | 0.017 % | 0.1 percentage points |
+| New solar built (MW) | 66.1 | 66.7 | information only |
+| Achieved MIP gap | 1.00 % | 0.83 % | |
+| Solver time | 39 s | 813 s | |
 
 Re-running with the same solver and package versions reproduces the reference numbers exactly (verified for Gurobi on the reference machine). The `--quick` mode compares against `test_case/maluku/expected_results_relaxed/`, produced with HiGHS on the LP relaxation (total cost 67.59 million USD/yr, a lower bound about 1 % below the exact model; 83 s of solver time).
 
@@ -66,7 +66,7 @@ Re-running with the same solver and package versions reproduces the reference nu
 | `data_indonesia/<year>/<island>/` | Inputs for 2030 and 2035 for sumatera, jawa_bali, kalimantan, sulawesi, north_maluku, maluku, papua, nusa_tenggara: `generators.csv`, `demand.csv`, `generators_variability.csv`, `fuels_data.csv`, plus `network.csv`/`zones.csv` for multi-zone islands and `ip_*.csv` for industrial parks. `industrial_park_datasheet_sample.xlsx` documents the industrial-park data collection template. |
 | `test_case/maluku/` | The reviewer test case: `config.json`, the reference outputs (`expected_results/`, `expected_results_relaxed/`) and `README.md`. `test_case/run_maluku_test.jl` runs it end to end. |
 | `scripts/` | `summarize_results.jl` (headline metrics and capacity/generation by technology for any results folder) and `compare_results.jl` (tolerance-based comparison of two results folders). |
-| `scenario_*.yml` | Run sets: islands, years, scenarios, clean cases, CO₂ limits and the solver. `scenario_maluku_test.yml` is the single test job; `scenario_2030_example.yml` is the full study set. |
+| `scenario_*.yml` | Run sets: islands, years, scenarios, clean cases, CO₂ limits and the solver. `scenario_maluku_test.yml` is the single test job; `scenario_2030_example.yml` is the 2030 study set (96 jobs), and adding `"2035"` to its `years` gives the 2035 set. |
 | `generate_jobs_local.py`, `generate_jobs.py`, `submit_template.sb` | Batch runners: one `config.json` per island/year/scenario/case, run sequentially on a laptop or submitted to SLURM. |
 | `Project.toml`, `Manifest.toml`, `bootstrap.jl` | Pinned Julia environment and its installer. |
 | `.github/workflows/test-case.yml` | Continuous integration: runs the quick Maluku check on HiGHS and exercises the job generators on every push. |
@@ -75,7 +75,7 @@ Re-running with the same solver and package versions reproduces the reference nu
 
 ## Installation
 
-**Julia (required).** Julia 1.10 or newer; the `Manifest.toml` was resolved with Julia 1.12. Then, from the repository root:
+**Julia (required).** Julia 1.12 is the tested version (`Manifest.toml` was resolved with 1.12.5 and CI runs 1.12); `Project.toml` allows 1.10 or newer, but on another version run `Pkg.resolve()` first if `bootstrap.jl` reports manifest errors. Then, from the repository root:
 
 ```bash
 julia bootstrap.jl
@@ -195,13 +195,13 @@ Every run writes these CSVs to its results folder:
 
 | File | Content |
 |------|---------|
-| `generator_results.csv` | Per grid generator: capacity before and after optimisation, generation and shares. `Start_MW` is the existing capacity for existing units and the maximum buildable size for new-build candidates (`New_Build = 1`). |
-| `storage_results.csv`, `transmission_results.csv` | Grid storage energy capacity and transmission capacity, before and after. |
+| `generator_results.csv` | Per grid generator: capacity before and after optimisation, generation and shares. `Start_MW` is the `Existing_Cap_MW` input: existing capacity for existing units, but for new-build candidates (`New_Build = 1`) only the nominal unit size used in the commitment constraints, not the build limit (`Max_Cap_MW` in `generators.csv`). |
+| `storage_results.csv`, `transmission_results.csv` | Grid storage energy capacity (MWh) and transmission capacity (MW), before and after. |
 | `nse_results.csv` | Non-served energy by demand segment and zone. |
 | `cost_results.csv` | Annual system cost in million USD/yr: total and its fixed, variable, start-up, import and non-served-energy components. |
 | `clean_energy_results.csv` | Annual CO₂ emissions (grid, industrial parks, total) and the grid renewable share. |
 | `ip_*.csv` | Industrial-park generators, heat, imports, storage and non-served energy (headers only when the island has no industrial-park data). |
-| `run_info.json` | How the run was produced: config, solver and package versions, Julia version, git commit, termination status, objective, achieved MIP gap, solver and wall time. |
+| `run_info.json` | How the run was produced: the effective config, solver library and Julia-package versions, Julia version, git commit and whether the tree had uncommitted changes, termination status, objective, achieved MIP gap, solver and wall time. |
 | `summary_by_technology.csv` | Written by `scripts/summarize_results.jl`: capacity and generation aggregated by technology. |
 
 Costs and emissions are annual values (hours are weighted by the representative-period weights in `demand.csv`). The `GWh` columns are sums over the sampled hours (8 representative weeks, 1,344 hours) and are not annualised; the `Percent_GWh` shares are unaffected.
@@ -227,7 +227,7 @@ Costs are annualised with the `Inv_Cost_per_MWyr` values in `generators.csv`; ho
 | Symptom | Fix |
 |---------|-----|
 | `julia: command not found` | Install Julia (juliaup) and reopen the terminal. |
-| Package errors on first run | Run `julia bootstrap.jl` again; if the Julia version differs from the one the manifest was resolved with, run `julia --project=. -e 'using Pkg; Pkg.resolve(); Pkg.instantiate()'`. |
+| Package errors on first run, or a warning that the manifest was resolved for a different Julia version | Run `julia --project=. -e 'using Pkg; Pkg.resolve(); Pkg.instantiate()'`, then `julia bootstrap.jl` again. |
 | `Solver "gurobi" could not start a working optimizer session` | No usable Gurobi licence; use the default `highs` or set `GRB_LICENSE_FILE`. |
 | `Config file is missing required keys` | Copy `test_case/maluku/config.json` and edit it. |
 | `Missing required input files in data_indonesia/...` | The island/year folder needs the four core CSVs; check the spelling of `island` and `year`. |
