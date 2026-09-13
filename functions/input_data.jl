@@ -64,9 +64,14 @@ function input_data(filepath)
     if "r_id" in names(variability)
         select!(variability, Not(:r_id))
     end
-    ncol(variability) >= length(G) ||
-        error("generators_variability.csv has $(ncol(variability)) profile columns but generators.csv lists $(length(G)) generators")
-    for g in G
+    # profiles are only applied to dispatchable-without-commitment (ED) units, so a
+    # column is required for every ED generator; other generators may lack one
+    ED_ids = generators.R_ID[generators.Commit .== 0]
+    ncol(variability) >= maximum(ED_ids; init = 0) ||
+        error("generators_variability.csv has $(ncol(variability)) profile columns but generators.csv has an ED generator with R_ID $(maximum(ED_ids)); every ED unit needs a profile column")
+    ncol(variability) < length(G) &&
+        @warn "generators_variability.csv has $(ncol(variability)) profile columns for $(length(G)) generators; generators $(ncol(variability)+1)-$(length(G)) have no profile (fine for unit-commitment units)"
+    for g in 1:min(ncol(variability), length(G))
         pname = strip(String(names(variability)[g])); rname = strip(String(generators.Resource[g]))
         pname == rname || @warn "generators_variability.csv column $(g) is '$(pname)' but generator $(g) is '$(rname)'"
     end
