@@ -265,8 +265,12 @@ function benders_subproblem(inputs, capacity_values, Grid, Captive, ImportPrice,
             vSTART[t,g] <= capacity_values.vCAP[g] / inputs.generators.Existing_Cap_MW[g]
         cShutBound[t in inputs.T, g in inputs.UC],
             vSHUT[t,g] <= capacity_values.vCAP[g] / inputs.generators.Existing_Cap_MW[g]
-        cCommitState[t in inputs.T_red, g in inputs.UC],
-            vCOMMIT[t+1,g] == vCOMMIT[t,g] + vSTART[t+1,g] - vSHUT[t+1,g]
+        #define the commit variable, normal
+        cCommitState[t in inputs.INTERIOR, g in inputs.UC],
+            vCOMMIT[t,g] == vCOMMIT[t-1,g] + vSTART[t,g] - vSHUT[t,g]
+        #define the commit variable, sub-period wrapping
+        cCommitStateWrap[t in inputs.START, g in inputs.UC],
+            vCOMMIT[t,g] == vCOMMIT[t+inputs.hours_per_period-1,g] + vSTART[t,g] - vSHUT[t,g]
         
         # Min up/down time constraints
         cUpTime[t in inputs.T, g in inputs.UC],
@@ -359,8 +363,12 @@ function benders_subproblem(inputs, capacity_values, Grid, Captive, ImportPrice,
             vIP_START[t,g] <= capacity_values.vIP_CAP[g] / inputs.ip_generators.Existing_Cap_MW[g]
         cIPShutBound[t in inputs.T, g in inputs.IP_UC],
             vIP_SHUT[t,g] <= capacity_values.vIP_CAP[g] / inputs.ip_generators.Existing_Cap_MW[g]
-        cIPCommitState[t in inputs.T_red, g in inputs.IP_UC],
-            vIP_COMMIT[t+1,g] == vIP_COMMIT[t,g] + vIP_START[t+1,g] - vIP_SHUT[t+1,g]
+        #define the commit variable, normal
+        cIPCommitState[t in inputs.INTERIOR, g in inputs.IP_UC],
+            vIP_COMMIT[t,g] == vIP_COMMIT[t-1,g] + vIP_START[t,g] - vIP_SHUT[t,g]
+        #define the commit variable, sub-period wrapping
+        cIPCommitStateWrap[t in inputs.START, g in inputs.IP_UC],
+            vIP_COMMIT[t,g] == vIP_COMMIT[t+inputs.hours_per_period-1,g] + vIP_START[t,g] - vIP_SHUT[t,g]
         
         # IP ramp constraints - CORRECTED
         cIPRampUp[t in inputs.INTERIOR, g in inputs.IP_ED],

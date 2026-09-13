@@ -4,7 +4,6 @@ using JuMP
 using Plots
 using DataFrames, CSV
 using Gurobi
-using HiGHS
 using Base.Filesystem: dirname, mkpath
 
 # 1) Load your core modeling code

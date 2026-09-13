@@ -117,6 +117,7 @@ function input_data(filepath)
             Industrial_Park             = Int[],
             technology                  = String[],
             Existing_Cap_MW            = Float64[],
+            Max_Cap_MW                  = Float64[],
             commodity                   = String[],
             plant_owner                 = String[],
             owner_parent_company        = String[],

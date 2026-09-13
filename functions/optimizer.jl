@@ -296,9 +296,13 @@ function capacity_expansion(inputs, mipgap, CO2_constraint, CO2_limit, RE_constr
             cShutBound[t in inputs.T, g in inputs.UC],
                 vSHUT[t,g] <= vCAP[g] / inputs.generators.Existing_Cap_MW[g]
 
-            #define the commit variable
-            cCommitState[t in inputs.T_red, g in inputs.UC],
-                vCOMMIT[t+1,g] == vCOMMIT[t,g] + vSTART[t+1,g] - vSHUT[t+1,g]
+            #define the commit variable, normal
+            cCommitState[t in inputs.INTERIOR, g in inputs.UC],
+                vCOMMIT[t,g] == vCOMMIT[t-1,g] + vSTART[t,g] - vSHUT[t,g]
+
+            #define the commit variable, sub-period wrapping
+            cCommitStateWrap[t in inputs.START, g in inputs.UC],
+                vCOMMIT[t,g] == vCOMMIT[t+inputs.hours_per_period-1,g] + vSTART[t,g] - vSHUT[t,g]
 
         end);
 
@@ -529,9 +533,13 @@ function capacity_expansion(inputs, mipgap, CO2_constraint, CO2_limit, RE_constr
             cIPShutBound[t in inputs.T, g in inputs.IP_UC],
                 vIP_SHUT[t,g] <= vIP_CAP[g] / inputs.ip_generators.Existing_Cap_MW[g]
 
-            #define the commit variable
-            cIPCommitState[t in inputs.T_red, g in inputs.IP_UC],
-                vIP_COMMIT[t+1,g] == vIP_COMMIT[t,g] + vIP_START[t+1,g] - vIP_SHUT[t+1,g]
+            #define the commit variable, normal
+            cIPCommitState[t in inputs.INTERIOR, g in inputs.IP_UC],
+                vIP_COMMIT[t,g] == vIP_COMMIT[t-1,g] + vIP_START[t,g] - vIP_SHUT[t,g]
+
+            #define the commit variable, sub-period wrapping
+            cIPCommitStateWrap[t in inputs.START, g in inputs.IP_UC],
+                vIP_COMMIT[t,g] == vIP_COMMIT[t+inputs.hours_per_period-1,g] + vIP_START[t,g] - vIP_SHUT[t,g]
 
         end);
 
