@@ -1,4 +1,13 @@
-# scenarios.yml
+# scenario_2030_example.yml
+#
+# Full 2030 study set: every island x every scenario x reference/clean.
+# These runs are large mixed-integer problems; the published results were
+# produced with Gurobi on an HPC cluster (generate_jobs.py). Use
+# scenario_maluku_test.yml for a laptop-sized check.
+
+# Solver for every job in this file: gurobi (licence required) or highs.
+solver: gurobi
+
 islands:
   - sumatera
   - jawa_bali

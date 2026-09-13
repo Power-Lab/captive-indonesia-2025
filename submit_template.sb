@@ -1,0 +1,24 @@
+#!/bin/bash
+# SLURM submission template used by generate_jobs.py, which symlinks this file
+# into every jobs/<job_name>/ folder and runs `sbatch` there, so the working
+# directory holds that job's config.json. Adapt the resource lines and the
+# module/licence lines to your cluster before submitting.
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=64G
+#SBATCH --time=3-00:00:00
+#SBATCH --output=slurm-%j.out
+##SBATCH --account=<account>
+##SBATCH --partition=<partition>
+
+set -euo pipefail
+
+# The repository root is the folder that holds run_model.jl. Because this file
+# is a symlink into the job folder, resolving the link finds it.
+REPO_ROOT="${CAPTIVE_REPO_ROOT:-$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)}"
+
+# module load julia                         # cluster-specific
+# export GRB_LICENSE_FILE=/path/to/gurobi.lic   # only for "solver": "gurobi"
+
+julia --project="$REPO_ROOT" "$REPO_ROOT/run_model.jl" --config config.json

@@ -1,0 +1,4 @@
+# Python dependencies for the job generators (generate_jobs.py, generate_jobs_local.py).
+# The model itself and the Maluku test case need only Julia.
+click>=8.0
+pyyaml>=6.0

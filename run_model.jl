@@ -106,11 +106,21 @@ function git_commit(root)
         nothing
     end
 end
+function git_dirty(root)
+    try
+        !isempty(strip(read(pipeline(`git -C $(root) status --porcelain --untracked-files=no`; stderr = devnull), String)))
+    catch
+        nothing
+    end
+end
 jsonnum(x) = (x isa AbstractFloat && !isfinite(x)) ? nothing : x
+# record the config location relative to the repository (basename if outside it) so
+# that run_info.json never contains machine-specific absolute paths
+config_label(path, root) = startswith(path, root) ? relpath(path, root) : basename(path)
 solver_pkg = solver == "gurobi" ? Gurobi : HiGHS
 run_info = Dict(
     "job_name"             => pre.job_name,
-    "config_file"          => cli.config_path,
+    "config_file"          => config_label(cli.config_path, REPO_ROOT),
     "config"               => cfg,
     "solver"               => solution.solver_name,
     "solver_package_version" => string(pkgversion(solver_pkg)),
@@ -118,6 +128,7 @@ run_info = Dict(
     "julia_version"        => string(VERSION),
     "platform"             => "$(Sys.KERNEL) $(Sys.ARCH), $(Sys.CPU_THREADS) threads",
     "git_commit"           => git_commit(REPO_ROOT),
+    "git_uncommitted_changes" => git_dirty(REPO_ROOT),
     "mipgap"               => mipgap,
     "relax_uc"             => relax_uc,
     "time_limit_s"         => time_limit,

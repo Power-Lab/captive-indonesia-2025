@@ -1,0 +1,73 @@
+name: maluku-test-case
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      exact:
+        description: "Also solve the exact MILP on HiGHS (slow on CI runners)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: test-case-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quick:
+    name: Maluku quick check (HiGHS, LP-relaxed unit commitment)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: "1.12"
+      - uses: julia-actions/cache@v2
+      - name: Bootstrap the pinned Julia environment
+        run: julia bootstrap.jl
+      - name: Preflight the test config
+        run: julia --project=. run_model.jl --config test_case/maluku/config.json --preflight-only
+      - name: Solve, summarise and compare with the reference
+        run: julia --project=. test_case/run_maluku_test.jl --quick
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: maluku-quick-results
+          path: results/
+
+  job-generators:
+    name: Python job generators
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Generate the Maluku job folder (no submission, no solve)
+        run: |
+          python generate_jobs.py --scenarios-file scenario_maluku_test.yml --output-root /tmp/jobs
+          cat /tmp/jobs/base_maluku_2030_reference/config.json
+          python generate_jobs.py --scenarios-file scenario_2030_example.yml --output-root /tmp/jobs_full | tail -1
+
+  exact:
+    name: Maluku exact MILP (HiGHS)
+    if: github.event_name == 'workflow_dispatch' && inputs.exact
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: "1.12"
+      - uses: julia-actions/cache@v2
+      - run: julia bootstrap.jl
+      - run: julia --project=. test_case/run_maluku_test.jl
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: maluku-exact-results
+          path: results/

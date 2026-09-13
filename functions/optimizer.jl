@@ -699,6 +699,11 @@ function capacity_expansion(inputs, mipgap, CO2_constraint, CO2_limit, RE_constr
     if relax_uc
         n_relaxed = relax_binaries!(CE, UC_BINARIES)
         println("relax_uc = true: $(n_relaxed) unit-commitment binaries relaxed to [0, 1] (LP).")
+        if lowercase(strip(solver)) == "highs"
+            # HiGHS's dual simplex needs well over ten minutes on this LP; its
+            # interior-point method with crossover solves it in about 90 s.
+            set_attribute(CE, "solver", "ipm")
+        end
     end
 
     println("Model built: $(num_variables(CE)) variables, ",
