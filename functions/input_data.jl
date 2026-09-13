@@ -1,3 +1,33 @@
+# Align a profile table (r_id + one column per resource) to a generator list by
+# resource name, in order of occurrence for duplicate names. Returns a DataFrame
+# with one column per generator, in generator order, so that `table[t, g]` is
+# generator g's profile at hour t.
+function align_profiles(raw::DataFrame, resources, ed_ids, filename::AbstractString)
+    "r_id" in names(raw) && select!(raw, Not(:r_id))
+    nT = nrow(raw)
+    # occurrence-aware lookup: the k-th column named X (after CSV.jl's X, X_1, X_2 suffixing)
+    occurrence = Dict{String,Int}()
+    cols = Vector{AbstractVector}(undef, length(resources))
+    missing_ed = String[]
+    for (g, r) in enumerate(resources)
+        name = strip(String(r))
+        k = get(occurrence, name, 0)
+        occurrence[name] = k + 1
+        col = k == 0 ? name : "$(name)_$(k)"
+        if col in names(raw)
+            cols[g] = raw[!, col]          # kept as read (a `missing` cell still fails at model build, as before)
+        else
+            cols[g] = ones(nT)
+            g in ed_ids && push!(missing_ed, "$(g):$(name)")
+        end
+    end
+    isempty(missing_ed) ||
+        @warn "$(filename): no profile column for ED generator(s) $(join(first(missing_ed, 5), ", "))$(length(missing_ed) > 5 ? ", ..." : "") - a constant availability of 1.0 is assumed for them; check the input data"
+    unused = setdiff(names(raw), [k == 1 ? n : "$(n)_$(k-1)" for (n, c) in occurrence for k in 1:c])
+    isempty(unused) || @warn "$(filename): $(length(unused)) profile column(s) match no generator and are ignored: $(join(first(unused, 5), ", "))$(length(unused) > 5 ? ", ..." : "")"
+    return DataFrame([Symbol("p$(g)") => cols[g] for g in eachindex(resources)])
+end
+
 function input_data(filepath)
 
     #GRID
@@ -56,25 +86,17 @@ function input_data(filepath)
     
 
     #Variability
-    #read generator capacity factors by hour. The file has an r_id column first and
-    #then one profile column per generator in R_ID order; the model indexes
-    #`variability[t, g]` by generator position, so the r_id column must be dropped
-    #or every generator would be capped by its predecessor's profile.
-    variability = DataFrame(CSV.File(joinpath(filepath, "generators_variability.csv")))
-    if "r_id" in names(variability)
-        select!(variability, Not(:r_id))
-    end
-    # profiles are only applied to dispatchable-without-commitment (ED) units, so a
-    # column is required for every ED generator; other generators may lack one
-    ED_ids = generators.R_ID[generators.Commit .== 0]
-    ncol(variability) >= maximum(ED_ids; init = 0) ||
-        error("generators_variability.csv has $(ncol(variability)) profile columns but generators.csv has an ED generator with R_ID $(maximum(ED_ids)); every ED unit needs a profile column")
-    ncol(variability) < length(G) &&
-        @warn "generators_variability.csv has $(ncol(variability)) profile columns for $(length(G)) generators; generators $(ncol(variability)+1)-$(length(G)) have no profile (fine for unit-commitment units)"
-    for g in 1:min(ncol(variability), length(G))
-        pname = strip(String(names(variability)[g])); rname = strip(String(generators.Resource[g]))
-        pname == rname || @warn "generators_variability.csv column $(g) is '$(pname)' but generator $(g) is '$(rname)'"
-    end
+    #read generator capacity factors by hour and align them to the generator list
+    #BY NAME. The file has an r_id column followed by one profile column per
+    #generator; the model indexes `variability[t, g]` by generator position, so
+    #the table is rebuilt with exactly one column per generator in R_ID order.
+    #Duplicate resource names are matched in order of occurrence (CSV.jl suffixes
+    #repeated headers as name_1, name_2, ...); columns that match no generator are
+    #ignored; a generator without a profile gets a constant 1.0 unless it is an
+    #ED unit, whose output is capped by the profile, in which case it is an error.
+    variability = align_profiles(
+        DataFrame(CSV.File(joinpath(filepath, "generators_variability.csv"))),
+        generators.Resource, generators.R_ID[generators.Commit .== 0], "generators_variability.csv")
 
     #Fuel - same data will be used for industrial park generators
     #read fuels data
@@ -202,10 +224,9 @@ function input_data(filepath)
     if isfile(joinpath(filepath, "ip_generators_variability.csv"))
         #read industrial park generator capacity factors by hour (same layout and
         #same positional indexing as generators_variability.csv)
-        ip_variability = DataFrame(CSV.File(joinpath(filepath, "ip_generators_variability.csv")));
-        if "r_id" in names(ip_variability)
-            select!(ip_variability, Not(:r_id))
-        end
+        ip_variability = align_profiles(
+            DataFrame(CSV.File(joinpath(filepath, "ip_generators_variability.csv"))),
+            ip_generators.Resource, ip_generators.R_ID[ip_generators.Commit .== 0], "ip_generators_variability.csv")
     else
         ip_variability = DataFrame(
             r_id = Int[]
