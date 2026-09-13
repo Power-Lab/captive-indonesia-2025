@@ -56,8 +56,20 @@ function input_data(filepath)
     
 
     #Variability
-    #read generator capacity factors by hour
+    #read generator capacity factors by hour. The file has an r_id column first and
+    #then one profile column per generator in R_ID order; the model indexes
+    #`variability[t, g]` by generator position, so the r_id column must be dropped
+    #or every generator would be capped by its predecessor's profile.
     variability = DataFrame(CSV.File(joinpath(filepath, "generators_variability.csv")))
+    if "r_id" in names(variability)
+        select!(variability, Not(:r_id))
+    end
+    ncol(variability) >= length(G) ||
+        error("generators_variability.csv has $(ncol(variability)) profile columns but generators.csv lists $(length(G)) generators")
+    for g in G
+        pname = strip(String(names(variability)[g])); rname = strip(String(generators.Resource[g]))
+        pname == rname || @warn "generators_variability.csv column $(g) is '$(pname)' but generator $(g) is '$(rname)'"
+    end
 
     #Fuel - same data will be used for industrial park generators
     #read fuels data
@@ -183,8 +195,12 @@ function input_data(filepath)
 
     #IP Variability
     if isfile(joinpath(filepath, "ip_generators_variability.csv"))
-        #read industrial park generator capacity factors by hour
+        #read industrial park generator capacity factors by hour (same layout and
+        #same positional indexing as generators_variability.csv)
         ip_variability = DataFrame(CSV.File(joinpath(filepath, "ip_generators_variability.csv")));
+        if "r_id" in names(ip_variability)
+            select!(ip_variability, Not(:r_id))
+        end
     else
         ip_variability = DataFrame(
             r_id = Int[]
