@@ -1,14 +1,16 @@
-function capacity_expansion(inputs, mipgap, CO2_constraint, CO2_limit, RE_constraint, RE_limit, Grid, Captive, ImportPrice, NoCoal, CO235reduction, BAUCO2emissions)
+# Capacity expansion + unit-commitment dispatch as one MILP.
+#
+# Keyword arguments (all optional, defaults reproduce the published set-up
+# except for the solver, which defaults to the open-source HiGHS):
+#   solver      "highs" or "gurobi" (see functions/solver.jl)
+#   relax_uc    LP-relax the unit-commitment binaries (fast, licence-free
+#               approximation; a lower bound on cost, not the published model)
+#   time_limit  solver wall-clock limit in seconds
+function capacity_expansion(inputs, mipgap, CO2_constraint, CO2_limit, RE_constraint, RE_limit, Grid, Captive, ImportPrice, NoCoal, CO235reduction, BAUCO2emissions;
+                            solver::AbstractString = "highs", relax_uc::Bool = false,
+                            time_limit::Real = 3 * 24 * 60 * 60)
 
-    CE = Model(Gurobi.Optimizer)
-    set_attribute(CE, "MIPGap", mipgap)
-    #set_attribute(CE, "LogFile", "gurobi_output.log")
-    set_attribute(CE, "Crossover", 0)
-    #set_attribute(CE, "UnboundedRay", 1)
-    #set_attribute(CE, "Nodes", 10)
-    set_attribute(CE, "TimeLimit", 3*24*60*60)
-    #set_attribute(CE, "Heuristics", 0)
-    #set_attribute(CE, "Cuts", 3)
+    CE = make_solver(solver; mipgap = mipgap, time_limit = time_limit)
 
     #DECISION VARIABLES
 
@@ -694,21 +696,28 @@ function capacity_expansion(inputs, mipgap, CO2_constraint, CO2_limit, RE_constr
     
     @objective(CE, Min, eCostObjective);
 
+    if relax_uc
+        n_relaxed = relax_binaries!(CE, UC_BINARIES)
+        println("relax_uc = true: $(n_relaxed) unit-commitment binaries relaxed to [0, 1] (LP).")
+    end
 
+    println("Model built: $(num_variables(CE)) variables, ",
+            "$(num_constraints(CE; count_variable_in_set_constraints = false)) constraints. Solving with $(solver_name(CE))...")
     optimize!(CE)
 
-    # … after you build CE …
-    #report_unbounded_continuous(CE)
-
-    if termination_status(CE) == MOI.OPTIMAL
-        println("The model solved successfully.")
-    elseif termination_status(CE) == MOI.TIME_LIMIT
-        println("The model reached the time limit.")
-    elseif termination_status(CE) == MOI.INFEASIBLE
+    mode = relax_uc ? "LP, unit commitment relaxed" : "MILP, exact unit commitment"
+    status = termination_status(CE)
+    if status == MOI.OPTIMAL
+        println("The model solved successfully ($(mode)).")
+    elseif status == MOI.TIME_LIMIT
+        println("The model reached the time limit ($(mode)); results use the best incumbent.")
+    elseif status == MOI.INFEASIBLE
         println("The model is infeasible.")
     else
-        println("The model did not solve successfully. Termination status: ", termination_status(CE))
+        println("The model did not solve successfully. Termination status: ", status)
     end
+    has_values(CE) || error("No feasible solution available to extract (termination status $(status)).")
+    gap = try relative_gap(CE) catch; NaN end
 
     if Grid
         IP_IMPORT = vIP_IMPORT
@@ -752,7 +761,13 @@ function capacity_expansion(inputs, mipgap, CO2_constraint, CO2_limit, RE_constr
         NSECosts = eNSECosts,
         IPNSECosts = eIPNSECosts,
         IPNSEHeatCosts = eIPNSEHeatCosts,
-        cost = objective_value(CE)
+        cost = objective_value(CE),
+        # solve metadata, recorded in run_info.json by run_model.jl
+        termination_status = string(status),
+        solve_time_s = solve_time(CE),
+        relative_gap = gap,
+        solver_name = solver_name(CE),
+        relax_uc = relax_uc
         )
 
 end

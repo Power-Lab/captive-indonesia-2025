@@ -1,8 +1,14 @@
 # function_compiler.jl
+#
+# Loads the inputs, solves the capacity-expansion model and writes the result
+# CSVs. The entry point (run_model.jl) must have imported JuMP, CSV,
+# DataFrames and the solver package (HiGHS always; Gurobi when requested)
+# before including this file.
 include("input_data.jl")
+include("solver.jl")
 include("optimizer.jl")
 include("result_extraction_function.jl")
-include("benders_decomposition.jl")
+include("benders_decomposition.jl")   # optional, experimental; not used by default
 
 function function_compiler(
         filepath::AbstractString,
@@ -17,7 +23,10 @@ function function_compiler(
         ImportPrice,
         NoCoal::Bool,
         CO235reduction::Bool,
-        BAUCO2emissions
+        BAUCO2emissions;
+        solver::AbstractString = "highs",
+        relax_uc::Bool = false,
+        time_limit::Real = 3 * 24 * 60 * 60
     )
     # 1) Load inputs
     inputs = input_data(filepath)
@@ -35,7 +44,10 @@ function function_compiler(
         ImportPrice,
         NoCoal,
         CO235reduction,
-        BAUCO2emissions
+        BAUCO2emissions;
+        solver = solver,
+        relax_uc = relax_uc,
+        time_limit = time_limit
     )
 
     # 3) Extract & write results into the folder

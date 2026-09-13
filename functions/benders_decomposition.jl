@@ -1,11 +1,13 @@
-using JuMP, Gurobi
+# Optional Benders decomposition of the capacity-expansion problem.
+# EXPERIMENTAL: this implementation uses a simplified optimality cut and
+# placeholder cost/emission accounting (see capacity_expansion_benders). It was
+# not used for the published results; the monolithic capacity_expansion in
+# optimizer.jl is the reference implementation.
+using JuMP
 
-function benders_master_problem(inputs, mipgap, CO2_constraint, CO2_limit, RE_constraint, RE_limit, Grid, Captive, ImportPrice, NoCoal, CO235reduction, BAUCO2emissions)
+function benders_master_problem(inputs, mipgap, CO2_constraint, CO2_limit, RE_constraint, RE_limit, Grid, Captive, ImportPrice, NoCoal, CO235reduction, BAUCO2emissions; solver::AbstractString = "highs")
     
-    MASTER = Model(Gurobi.Optimizer)
-    set_attribute(MASTER, "MIPGap", mipgap)
-    set_attribute(MASTER, "Crossover", 0)
-    set_attribute(MASTER, "TimeLimit", 2*24*60*60)
+    MASTER = make_solver(solver; mipgap = mipgap, time_limit = 2*24*60*60)
     
     # MASTER PROBLEM VARIABLES (Capacity/Investment Decisions)
     @variables(MASTER, begin
@@ -124,10 +126,9 @@ function benders_master_problem(inputs, mipgap, CO2_constraint, CO2_limit, RE_co
     )
 end
 
-function benders_subproblem(inputs, capacity_values, Grid, Captive, ImportPrice, NoCoal, CO235reduction, BAUCO2emissions)
+function benders_subproblem(inputs, capacity_values, Grid, Captive, ImportPrice, NoCoal, CO235reduction, BAUCO2emissions; solver::AbstractString = "highs")
     
-    SUB = Model(Gurobi.Optimizer)
-    set_attribute(SUB, "OutputFlag", 0)  # Suppress output for subproblem
+    SUB = make_solver(solver; silent = true)  # suppress solver output for the subproblem
     
     # SUBPROBLEM VARIABLES (Operational Decisions)
     @variables(SUB, begin
@@ -431,10 +432,10 @@ function benders_subproblem(inputs, capacity_values, Grid, Captive, ImportPrice,
     )
 end
 
-function solve_benders_decomposition(inputs, mipgap, CO2_constraint, CO2_limit, RE_constraint, RE_limit, Grid, Captive, ImportPrice, NoCoal, CO235reduction, BAUCO2emissions; max_iter=100, tolerance=1e-6)
+function solve_benders_decomposition(inputs, mipgap, CO2_constraint, CO2_limit, RE_constraint, RE_limit, Grid, Captive, ImportPrice, NoCoal, CO235reduction, BAUCO2emissions; max_iter=100, tolerance=1e-6, solver::AbstractString = "highs")
     
     # Initialize
-    master_model, master_vars = benders_master_problem(inputs, mipgap, CO2_constraint, CO2_limit, RE_constraint, RE_limit, Grid, Captive, ImportPrice, NoCoal, CO235reduction, BAUCO2emissions)
+    master_model, master_vars = benders_master_problem(inputs, mipgap, CO2_constraint, CO2_limit, RE_constraint, RE_limit, Grid, Captive, ImportPrice, NoCoal, CO235reduction, BAUCO2emissions; solver = solver)
     
     upper_bound = Inf
     lower_bound = -Inf
@@ -466,7 +467,7 @@ function solve_benders_decomposition(inputs, mipgap, CO2_constraint, CO2_limit, 
         )
         
         # Solve subproblem
-        sub_model, sub_vars = benders_subproblem(inputs, capacity_values, Grid, Captive, ImportPrice, NoCoal, CO235reduction, BAUCO2emissions)
+        sub_model, sub_vars = benders_subproblem(inputs, capacity_values, Grid, Captive, ImportPrice, NoCoal, CO235reduction, BAUCO2emissions; solver = solver)
         optimize!(sub_model)
         
         if termination_status(sub_model) != MOI.OPTIMAL
@@ -483,7 +484,7 @@ function solve_benders_decomposition(inputs, mipgap, CO2_constraint, CO2_limit, 
         end
         
         sub_objective = objective_value(sub_model)
-        current_upper_bound = value(master_vars.η[1]) + sub_objective
+        current_upper_bound = value(master_vars.η) + sub_objective
         
         if current_upper_bound < upper_bound
             upper_bound = current_upper_bound
@@ -540,12 +541,12 @@ function solve_benders_decomposition(inputs, mipgap, CO2_constraint, CO2_limit, 
 end
 
 # Wrapper function that mimics the original capacity_expansion interface
-function capacity_expansion_benders(inputs, mipgap, CO2_constraint, CO2_limit, RE_constraint, RE_limit, Grid, Captive, ImportPrice, NoCoal, CO235reduction, BAUCO2emissions)
+function capacity_expansion_benders(inputs, mipgap, CO2_constraint, CO2_limit, RE_constraint, RE_limit, Grid, Captive, ImportPrice, NoCoal, CO235reduction, BAUCO2emissions; solver::AbstractString = "highs")
     
-    result = solve_benders_decomposition(inputs, mipgap, CO2_constraint, CO2_limit, RE_constraint, RE_limit, Grid, Captive, ImportPrice, NoCoal, CO235reduction, BAUCO2emissions)
+    result = solve_benders_decomposition(inputs, mipgap, CO2_constraint, CO2_limit, RE_constraint, RE_limit, Grid, Captive, ImportPrice, NoCoal, CO235reduction, BAUCO2emissions; solver = solver)
     
     # Solve final subproblem to get operational variables
-    final_sub_model, final_sub_vars = benders_subproblem(inputs, result.capacity_values, Grid, Captive, ImportPrice, NoCoal, CO235reduction, BAUCO2emissions)
+    final_sub_model, final_sub_vars = benders_subproblem(inputs, result.capacity_values, Grid, Captive, ImportPrice, NoCoal, CO235reduction, BAUCO2emissions; solver = solver)
     optimize!(final_sub_model)
     
     # Extract results in the same format as original function

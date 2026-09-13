@@ -110,7 +110,18 @@ function result_extraction(
 
     ip_storage = DataFrame()
     try
-        if solution.IP_E_CAP isa AbstractArray
+        if isempty(inputs.IP_STOR)
+            # dataset without industrial-park storage: write the header only
+            ip_storage = DataFrame(
+                ID                    = Int[],
+                Zone                  = eltype(inputs.ip_generators.Zone)[],
+                Industrial_Park       = Int[],
+                Resource              = String[],
+                Total_Storage_MWh     = Float64[],
+                Start_Storage_MWh     = Float64[],
+                Change_in_Storage_MWh = Float64[],
+            )
+        elseif solution.IP_E_CAP isa AbstractArray
             total_storage = value.(solution.IP_E_CAP)
             start_storage = inputs.ip_generators.Existing_Cap_MW[inputs.IP_STOR]
             change_storage = total_storage .- start_storage
