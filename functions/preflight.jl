@@ -105,6 +105,23 @@ function validate_input_files(inputs_path::AbstractString, flags)
     return nothing
 end
 
+# Cheap sanity checks on the input tables that have bitten before. Warnings only:
+# the model still runs, but the reviewer sees the problem before reading results.
+const FOSSIL_FUELS = ("coal", "gas", "diesel", "coal_captive")
+
+function validate_input_data(inputs_path::AbstractString)
+    gens = CSV.read(joinpath(inputs_path, "generators.csv"), DataFrame)
+    if "RE" in names(gens) && "Fuel" in names(gens)
+        bad = gens[(coalesce.(gens.RE, 0) .== 1) .& in.(lowercase.(string.(gens.Fuel)), Ref(FOSSIL_FUELS)), :]
+        nrow(bad) > 0 && @warn "generators.csv: $(nrow(bad)) fossil-fuelled generator(s) flagged RE = 1 (R_ID $(join(first(bad.R_ID, 8), ", "))$(nrow(bad) > 8 ? ", ..." : "")); they would count towards the renewable share"
+    end
+    zones = sort(unique(collect(skipmissing(gens.Zone))))
+    demand_cols = filter(c -> startswith(c, "demand_z"), names(CSV.read(joinpath(inputs_path, "demand.csv"), DataFrame; limit = 1)))
+    length(demand_cols) == length(zones) ||
+        @warn "demand.csv has $(length(demand_cols)) demand_z columns but generators.csv defines $(length(zones)) zone(s) $(zones); only demand_z<zone> columns are used, check that the file belongs to this island"
+    return nothing
+end
+
 function run_preflight(config_path::AbstractString, repo_root::AbstractString; solver::AbstractString)
     cfg = load_config(config_path)
     flags = scenario_settings(String(cfg["scenario"]))
@@ -117,6 +134,7 @@ function run_preflight(config_path::AbstractString, repo_root::AbstractString; s
 
     validate_solver(solver)
     validate_input_files(inputs_path, flags)
+    validate_input_data(inputs_path)
 
     return (cfg = cfg, flags = flags, clean_flags = clean_flags,
             inputs_path = inputs_path, results_dir = results_dir,
