@@ -12,7 +12,7 @@
 # BAUCO2emissions, CO2_limit. Optional keys (defaults in brackets):
 #   solver      "highs" | "gurobi"          ["highs"]  open-source HiGHS needs no licence
 #   mipgap      relative MIP gap            [0.01]
-#   relax_uc    LP-relax unit commitment    [false]    fast approximation, not the published model
+#   relax_uc    LP-relax unit commitment    [false]    lower-bound approximation, not the published model
 #   time_limit  solver limit in seconds     [259200]   3 days; on expiry the incumbent is written
 #   RE_limit    minimum RE share, clean runs [0.34]
 #   run_tag     suffix for the results folder [""]

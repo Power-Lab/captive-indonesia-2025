@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: "If you use this model or its data, please cite it using the metadata below."
+title: "Captive Indonesia Capacity Expansion Model"
+type: software
+authors:
+  - family-names: Gnapathy
+    given-names: Kaarthi A
+license: MIT
+repository-code: "https://github.com/Power-Lab/captive-indonesia-2025"
+doi: 10.5281/zenodo.21911294
+version: "1.0.0"
+date-released: "2026-09-13"

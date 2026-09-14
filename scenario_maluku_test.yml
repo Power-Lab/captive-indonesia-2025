@@ -7,9 +7,8 @@
 # Use this file to verify your Julia/Python environment on a local machine
 # before attempting a full multi-island run. Maluku is the smallest grid in
 # the dataset (no network or industrial-park files required), so it is the
-# quickest job to solve: about 15 minutes with HiGHS (the default, no
-# licence), about 1 minute with Gurobi (solver: gurobi below), or about
-# 2 minutes as an LP smoke test with relax_uc: true.
+# quickest job to solve (the README gives measured runtimes for HiGHS, the
+# default and licence-free, and for Gurobi, solver: gurobi below).
 #
 # Scope
 # -----

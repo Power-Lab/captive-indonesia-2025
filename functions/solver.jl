@@ -76,8 +76,9 @@ const UC_BINARIES = (:vCOMMIT, :vSTART, :vSHUT, :vIP_COMMIT, :vIP_START, :vIP_SH
 
 LP-relax the named binary variable containers on `model`: each binary variable
 is freed to the continuous range `[0, 1]`. Turns the unit-commitment MILP into
-an LP, which HiGHS solves in a fraction of the time. The relaxed solution is a
-lower bound on cost and is not the model used for the published results.
+an LP. The relaxed solution is a lower bound on cost and is not the model used
+for the published results; on HiGHS the LP is not necessarily faster than the
+MILP for these instances.
 Names absent from the model are skipped.
 """
 function relax_binaries!(model, names)

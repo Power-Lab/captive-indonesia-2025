@@ -1,6 +1,7 @@
 # Captive Indonesia Capacity Expansion Model
 
 [![maluku-test-case](https://github.com/Power-Lab/captive-indonesia-2025/actions/workflows/test-case.yml/badge.svg)](https://github.com/Power-Lab/captive-indonesia-2025/actions/workflows/test-case.yml)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21911294.svg)](https://doi.org/10.5281/zenodo.21911294)
 
 An **open-source capacity expansion and unit-commitment model** for Indonesia's island power systems and their captive (industrial-park) generation. For each island and planning year the model co-optimises **generation and storage investments** with **hourly dispatch** over representative weeks, under policy scenarios that switch grid access for industrial parks, on-site captive generation, coal restrictions, import prices, and CO₂ and renewable-share constraints.
 
@@ -21,7 +22,7 @@ This section is for reviewers and anyone who wants to check that the code runs a
 
 All input data for every island and year is in `data_indonesia/`, and the scenario files that define the published run set are in the repository root, so the full study can be regenerated on a cluster with the commands in [Batch runs](#batch-runs). The outputs of those runs are not archived in this repository; only the Maluku reference outputs are.
 
-**Run the Maluku test case** (about 15 minutes on a recent laptop with HiGHS)
+**Run the Maluku test case** (a few minutes with Gurobi; HiGHS needs no licence but is slow on this case, see below)
 
 1. Install [Julia](https://julialang.org/downloads/) 1.12, ideally through [juliaup](https://github.com/JuliaLang/juliaup) (`juliaup add 1.12`). The package manifest was resolved with 1.12 and CI tests 1.12; other 1.x versions should work after `Pkg.resolve()` (see Troubleshooting). Nothing else is needed.
 2. From the repository root, install the pinned packages once:
@@ -32,28 +33,29 @@ All input data for every island and year is in `data_indonesia/`, and the scenar
    ```bash
    julia --project=. test_case/run_maluku_test.jl
    ```
-   The last line is `MALUKU_TEST_PASSED` or `MALUKU_TEST_FAILED`. Results are written to `results/base_maluku_2030_reference__test_exact_highs/` (one folder per mode and solver), including the effective `config.json`, `run_info.json` (solver and package versions, git commit, MIP gap, solve time) and `summary_by_technology.csv`.
+   The last line is `MALUKU_TEST_PASSED` or `MALUKU_TEST_FAILED`. Results are written to `results/base_maluku_2030_reference__test_highs/` (one folder per solver), including the effective `config.json`, `run_info.json` (solver and package versions, git commit, MIP gap, solve time) and `summary_by_technology.csv`.
 
-Variants:
+With a Gurobi licence the same model solves in a few minutes:
 
 ```bash
-julia --project=. test_case/run_maluku_test.jl --solver gurobi   # same model on Gurobi, about 1 minute (licence required)
-julia --project=. test_case/run_maluku_test.jl --quick           # LP relaxation of unit commitment, about 2 minutes; a smoke test, not the published model
+julia --project=. test_case/run_maluku_test.jl --solver gurobi
 ```
 
 **What to expect.** The reference outputs in `test_case/maluku/expected_results/` were produced with Gurobi, the solver used for the article. The model is solved to a 1 % MIP gap, so a different solver (or a different machine) legitimately lands on a different near-optimal plan; the comparison therefore checks headline metrics against tolerances rather than requiring identical CSVs. Observed values on an Apple Silicon laptop:
 
-| Metric | Reference (Gurobi 13.0, exact MILP) | HiGHS 1.15, exact MILP | Comparison tolerance |
-|--------|------:|------:|------|
-| Total system cost (million USD/yr) | 68.31 | 68.16 | 2 % relative |
-| CO₂ emissions (tCO₂/yr) | 690,071 | 686,908 | 5 % relative |
-| Grid renewable share | 69.5 % | 69.5 % | 3 percentage points |
-| Non-served energy (share of demand) | 0.017 % | 0.017 % | 0.1 percentage points |
-| New solar built (MW) | 66.1 | 66.7 | information only |
-| Achieved MIP gap | 1.00 % | 0.83 % | |
-| Solver time | 39 s | 813 s | |
+| Metric | Reference (Gurobi 13.0, exact MILP) | Comparison tolerance |
+|--------|------:|------|
+| Total system cost (million USD/yr) | 88.01 | 2 % relative |
+| CO₂ emissions (tCO₂/yr) | 850,342 | 5 % relative |
+| Grid renewable share | 2.6 % | 3 percentage points |
+| Non-served energy (share of demand) | 0.34 % | 0.1 percentage points |
+| New build (MW) | 50 diesel, 5 solar, 3 battery | information only |
+| Achieved MIP gap | 0.82 % | |
+| Solver time (Apple Silicon laptop) | 183 s | |
 
-Re-running with the same solver and package versions reproduces the reference numbers exactly (verified for Gurobi on the reference machine). The `--quick` mode compares against `test_case/maluku/expected_results_relaxed/`, produced with HiGHS on the LP relaxation (total cost 67.59 million USD/yr, a lower bound about 1 % below the exact model; 83 s of solver time).
+Re-running with the same solver and package versions reproduces the reference numbers exactly (verified for Gurobi on the reference machine).
+
+**HiGHS runtime.** The same MILP is much harder for HiGHS 1.15 than for Gurobi: on the reference laptop a HiGHS run had not finished the root relaxation after 75 minutes, so plan for hours rather than minutes. Set `"time_limit"` (seconds) in `test_case/maluku/config.json` to bound the run; on expiry the best incumbent is written together with the achieved gap in `run_info.json`, and the comparison reports whether it is within tolerance.
 
 ---
 
@@ -64,12 +66,12 @@ Re-running with the same solver and package versions reproduces the reference nu
 | `run_model.jl` | Entry point. Reads a `config.json`, validates it, solves one scenario and writes the result CSVs plus `run_info.json`. |
 | `functions/` | Julia model code: `input_data.jl` (CSV inputs to sets and parameters), `solver.jl` (HiGHS/Gurobi selection), `optimizer.jl` (the MILP: `capacity_expansion`), `result_extraction_function.jl` (result CSVs), `preflight.jl` (CLI, config and input checks), `function_compiler.jl` (ties them together), `benders_decomposition.jl` (an experimental Benders variant, not used for the published results). |
 | `data_indonesia/<year>/<island>/` | Inputs for 2030 and 2035 for sumatera, jawa_bali, kalimantan, sulawesi, north_maluku, maluku, papua, nusa_tenggara: `generators.csv`, `demand.csv`, `generators_variability.csv`, `fuels_data.csv`, plus `network.csv`/`zones.csv` for multi-zone islands and `ip_*.csv` for industrial parks. `industrial_park_datasheet_sample.xlsx` documents the industrial-park data collection template. |
-| `test_case/maluku/` | The reviewer test case: `config.json`, the reference outputs (`expected_results/`, `expected_results_relaxed/`) and `README.md`. `test_case/run_maluku_test.jl` runs it end to end. |
+| `test_case/maluku/` | The reviewer test case: `config.json`, the reference outputs (`expected_results/`) and `README.md`. `test_case/run_maluku_test.jl` runs it end to end. |
 | `scripts/` | `summarize_results.jl` (headline metrics and capacity/generation by technology for any results folder) and `compare_results.jl` (tolerance-based comparison of two results folders). |
 | `scenario_*.yml` | Run sets: islands, years, scenarios, clean cases, CO₂ limits and the solver. `scenario_maluku_test.yml` is the single test job; `scenario_2030_example.yml` is the 2030 study set (96 jobs), and adding `"2035"` to its `years` gives the 2035 set. |
 | `generate_jobs_local.py`, `generate_jobs.py`, `submit_template.sb` | Batch runners: one `config.json` per island/year/scenario/case, run sequentially on a laptop or submitted to SLURM. |
 | `Project.toml`, `Manifest.toml`, `bootstrap.jl` | Pinned Julia environment and its installer. |
-| `.github/workflows/test-case.yml` | Continuous integration: runs the quick Maluku check on HiGHS and exercises the job generators on every push. |
+| `.github/workflows/test-case.yml` | Continuous integration: installs the environment, runs the preflight and result scripts and exercises the job generators on every push; the full HiGHS solve of the test case can be dispatched manually. |
 
 ---
 
@@ -125,7 +127,7 @@ Required keys: `island`, `year`, `scenario`, `clean`, `CO235reduction`, `BAUCO2e
 |-----|---------|---------|
 | `solver` | `"highs"` | `"highs"` (open source) or `"gurobi"`; `--solver` on the command line overrides it |
 | `mipgap` | `0.01` | relative MIP gap |
-| `relax_uc` | `false` | LP-relax the unit-commitment binaries (HiGHS then uses its interior-point method). Fast and licence-free, and a lower bound on cost, but not the published model |
+| `relax_uc` | `false` | LP-relax the unit-commitment binaries. A lower bound on cost, not the published model; on HiGHS the LP is not faster than the MILP for Maluku |
 | `time_limit` | `259200` | solver wall-clock limit in seconds (3 days). On expiry the best incumbent is written and `run_info.json` records the achieved gap |
 | `RE_limit` | `0.34` | minimum grid renewable energy share enforced in `clean` runs |
 | `run_tag` | `""` | suffix for the results folder, for runs that differ only in config keys |
@@ -232,13 +234,17 @@ Costs are annualised with the `Inv_Cost_per_MWyr` values in `generators.csv`; ho
 | `Config file is missing required keys` | Copy `test_case/maluku/config.json` and edit it. |
 | `Missing required input files in data_indonesia/...` | The island/year folder needs the four core CSVs; check the spelling of `island` and `year`. |
 | `ModuleNotFoundError: click` | `pip install -r requirements.txt` in the Python you actually invoke. |
-| A HiGHS run seems stuck at the root node | The exact MILP spends most of its time there; Maluku takes about 15 minutes, larger islands much longer. Use `--quick`/`relax_uc` for a fast approximation or Gurobi for the exact model. |
+| A HiGHS run seems stuck at the root node | The exact MILP spends most of its time there; for Maluku the root relaxation alone can take over an hour on HiGHS, larger islands far longer. Gurobi solves the same model in minutes; `time_limit` bounds a HiGHS run. |
 
 ---
 
 ## Contributing
 
 Issues and pull requests are welcome. Please open an issue first for substantial changes so they can be discussed against the published model formulation.
+
+## Citation
+
+The repository is archived on Zenodo: [doi:10.5281/zenodo.21911294](https://doi.org/10.5281/zenodo.21911294). Citation metadata is in [`CITATION.cff`](CITATION.cff); the accompanying article will be referenced here once it is published.
 
 ## Licence
 
