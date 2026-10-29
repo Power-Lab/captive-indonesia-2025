@@ -1,0 +1,65 @@
+# 2035 production runs (batch 1) of the captive-indonesia-2025 model.
+#
+# Full 2035 study set: every island x every scenario x reference/clean.
+# These runs are large mixed-integer problems; the published results were
+# produced with Gurobi on an HPC cluster (generate_jobs.py). Use
+# scenario_maluku_test.yml for a laptop-sized check.
+
+# Solver for every job in this file: gurobi (licence required) or highs.
+solver: gurobi
+
+islands:
+  - sumatera
+  - jawa_bali
+  - kalimantan
+  - sulawesi
+  - north_maluku
+  - maluku
+  - papua
+  - nusa_tenggara
+
+years:
+  - "2035"
+
+scenarios:
+  - base
+  - grid
+  - gridcaptive
+  - captive
+  - nocoal
+  - highimportprice
+
+cleans:
+  - reference
+  - clean
+
+# Park CO2 baseline (t/yr) for the 2035 clean case, per island. The clean case caps the
+# island's TOTAL industrial-park CO2 at 0.65 x this value (PerPres 112/2022: 35% below
+# business as usual), one aggregate over all of the island's parks (cCO2EmissionsIP).
+# Each value is CO2_Emissions_IP of that island's 2035 base/reference run (no grid import,
+# no new captive build). Islands without a value have no finished reference run yet, so
+# generate_jobs.py refuses to build their clean jobs.
+island_params:
+  sulawesi: 45817236   # base_sulawesi_2035_reference (OPTIMAL, gap 0.15%, commit dce98a1); cap 29781203
+  # pending: sumatera, jawa_bali, kalimantan, north_maluku, maluku, papua, nusa_tenggara
+
+# per‑year, per‑island CO2_limit values
+co2_limits:
+  "2030":
+    sumatera: 86780000
+    jawa_bali: 116430000
+    kalimantan: 34390000
+    sulawesi: 19410000
+    north_maluku: 3880000
+    maluku: 5820000
+    papua: 15520000
+    nusa_tenggara: 7760000
+  "2035":
+    sumatera: 60500000
+    jawa_bali: 81200000
+    kalimantan: 88600000
+    sulawesi: 13500000
+    north_maluku: 2700000
+    maluku: 4100000
+    papua: 10800000
+    nusa_tenggara: 5400000
