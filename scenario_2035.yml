@@ -40,7 +40,7 @@ cleans:
 # no new captive build). Islands without a value have no finished reference run yet, so
 # generate_jobs.py refuses to build their clean jobs.
 island_params:
-  sulawesi: 45817236   # base_sulawesi_2035_reference (OPTIMAL, gap 0.15%, commit dce98a1); cap 29781203
+  sulawesi: 45817236   # base_sulawesi_2035_reference (OPTIMAL, gap 0.53%, commit 3bbb593); cap 29781203
   # pending: sumatera, jawa_bali, kalimantan, north_maluku, maluku, papua, nusa_tenggara
 
 # per‑year, per‑island CO2_limit values
