@@ -41,6 +41,10 @@ cleans:
 # generate_jobs.py refuses to build their clean jobs.
 island_params:
   sulawesi: 45817236   # base_sulawesi_2035_reference (OPTIMAL, gap 0.39%, commit 4c2fd6d); cap 29781203
+  # Captive coal-price variants (scripts/coal_price_variant.py): Sulawesi inputs with only the
+  # coal_captive price changed; same baseline as sulawesi. Not in islands: run by name.
+  sulawesi_coal70: 45817236
+  sulawesi_coal100: 45817236
   # pending: sumatera, jawa_bali, kalimantan, north_maluku, maluku, papua, nusa_tenggara
 
 # per‑year, per‑island CO2_limit values
@@ -59,6 +63,8 @@ co2_limits:
     jawa_bali: 81200000
     kalimantan: 88600000
     sulawesi: 13500000
+    sulawesi_coal70: 13500000    # coal-price variants: same as sulawesi
+    sulawesi_coal100: 13500000
     north_maluku: 2700000
     maluku: 4100000
     papua: 10800000
