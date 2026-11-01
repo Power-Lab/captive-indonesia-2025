@@ -14,6 +14,11 @@ function capacity_expansion(inputs, mipgap, CO2_constraint, CO2_limit, RE_constr
 
     #DECISION VARIABLES
 
+    # storage that is neither ED nor UC (batteries, Commit = 2) gets its power capacity here;
+    # otherwise its vCAP is defined by nothing and costs nothing
+    STOR_NEW = setdiff(intersect(inputs.STOR, inputs.NEW), inputs.ED, inputs.UC)
+    STOR_OLD = setdiff(intersect(inputs.STOR, inputs.OLD), inputs.ED, inputs.UC)
+
     #Capacity decision variables
     @variables(CE, begin
 
@@ -29,6 +34,7 @@ function capacity_expansion(inputs, mipgap, CO2_constraint, CO2_limit, RE_constr
         vE_CAP[g in inputs.STOR]          >= 0 # storage energy capacity (MWh)
         vRET_E_CAP[g in intersect(inputs.STOR, inputs.OLD)]   >= 0 # retirement storage capacity
         vNEW_E_CAP[g in intersect(inputs.STOR, inputs.NEW)]   >= 0 # new build storage capacity
+        vNEW_CAP_STOR[g in STOR_NEW]                          >= 0 # new build storage power capacity (MW)
 
         #transmission variables
         vT_CAP[l in inputs.L]               >= 0 # transmission capacity (MW)
@@ -47,6 +53,10 @@ function capacity_expansion(inputs, mipgap, CO2_constraint, CO2_limit, RE_constr
 
     for g in inputs.ED_NEW[inputs.generators[inputs.ED_NEW, :Max_Cap_MW].>0]
         set_upper_bound(vNEW_CAP_ED[g], inputs.generators.Max_Cap_MW[g])
+    end
+
+    for g in STOR_NEW[inputs.generators[STOR_NEW, :Max_Cap_MW].>0]
+        set_upper_bound(vNEW_CAP_STOR[g], inputs.generators.Max_Cap_MW[g])
     end
 
     #set upper bounds on transmission capacity expansion
@@ -167,6 +177,9 @@ function capacity_expansion(inputs, mipgap, CO2_constraint, CO2_limit, RE_constr
             
             #max charge constraint
             cMaxCharge[t in inputs.T, g in inputs.STOR], vCHARGE[t,g] <= vCAP[g]
+
+            #max discharge constraint
+            cMaxDischarge[t in inputs.T, g in inputs.STOR], vGEN[t,g] <= vCAP[g]
             
             #max state of charge constraint
             cMaxSOC[t in inputs.T, g in inputs.STOR], vSOC[t,g] <= vE_CAP[g]
@@ -197,6 +210,10 @@ function capacity_expansion(inputs, mipgap, CO2_constraint, CO2_limit, RE_constr
         
             #total capacity for new UC units
             cCapNewUC[g in inputs.UC_NEW], vCAP[g] == vNEW_CAP_UC[g]
+
+            #power capacity for existing and new storage units
+            cCapOldStor[g in STOR_OLD], vCAP[g] == inputs.generators.Existing_Cap_MW[g]
+            cCapNewStor[g in STOR_NEW], vCAP[g] == vNEW_CAP_STOR[g]
 
             #total energy storage capacity for existing units
             cCapEnergyOld[g in intersect(inputs.STOR, inputs.OLD)], 
@@ -629,7 +646,9 @@ function capacity_expansion(inputs, mipgap, CO2_constraint, CO2_limit, RE_constr
         #fixed costs for total storage capacity
         sum(inputs.generators.Fixed_OM_Cost_per_MWhyr[g]*vE_CAP[g] for g in inputs.STOR) + 
         #investment costs for new storage energy capacity
-        sum(inputs.generators.Inv_Cost_per_MWhyr[g]*vNEW_E_CAP[g] for g in intersect(inputs.STOR, inputs.NEW))
+        sum(inputs.generators.Inv_Cost_per_MWhyr[g]*vNEW_E_CAP[g] for g in intersect(inputs.STOR, inputs.NEW)) +
+        #investment costs for new storage power capacity
+        sum(inputs.generators.Inv_Cost_per_MWyr[g]*vNEW_CAP_STOR[g] for g in STOR_NEW)
         );
 
     #fixed cost for storage
