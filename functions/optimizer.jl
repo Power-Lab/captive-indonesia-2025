@@ -64,6 +64,11 @@ function capacity_expansion(inputs, mipgap, CO2_constraint, CO2_limit, RE_constr
             # vTHETA[inputs.T, inputs.Z]          >= 0 # theta angle for transmission lines (radians)
     end)
 
+    # park storage that is neither ED nor UC (batteries, Commit = 2) gets its power capacity
+    # here; otherwise its vIP_CAP is defined by nothing and costs nothing
+    IP_STOR_NEW = setdiff(intersect(inputs.IP_STOR, inputs.IP_NEW), inputs.IP_ED, inputs.IP_UC)
+    IP_STOR_OLD = setdiff(intersect(inputs.IP_STOR, inputs.IP_OLD), inputs.IP_ED, inputs.IP_UC)
+
     #industrial park decision variables
     @variables(CE, begin
    
@@ -71,6 +76,7 @@ function capacity_expansion(inputs, mipgap, CO2_constraint, CO2_limit, RE_constr
             vIP_E_CAP[inputs.IP_STOR]                          >= 0 #energy storage capacity (MWh)
             vIP_RET_E_CAP[inputs.IP_STOR]                      >= 0 #retirement of onsite storage units
             vIP_NEW_E_CAP[inputs.IP_STOR]                      >= 0 #new build onsite storage units
+            vIP_NEW_CAP_STOR[IP_STOR_NEW]                      >= 0 #new build onsite storage power (MW)
 
             vIP_RET_CAP_ED[inputs.IP_ED]                        >= 0 #retirement of onsite ED units
             vIP_NEW_CAP_ED[inputs.IP_ED]                        >= 0 #new build onsite ED units
@@ -112,6 +118,10 @@ function capacity_expansion(inputs, mipgap, CO2_constraint, CO2_limit, RE_constr
 
     for g in intersect(inputs.IP_STOR, inputs.IP_NEW)
         set_upper_bound(vIP_NEW_E_CAP[g], 208.0)
+    end
+
+    for g in IP_STOR_NEW[inputs.ip_generators[IP_STOR_NEW, :Max_Cap_MW].>0]
+        set_upper_bound(vIP_NEW_CAP_STOR[g], inputs.ip_generators.Max_Cap_MW[g])
     end
 
 
@@ -406,8 +416,17 @@ function capacity_expansion(inputs, mipgap, CO2_constraint, CO2_limit, RE_constr
             cIPUcNew[g in inputs.IP_UC_NEW], 
                 vIP_CAP[g] == vIP_NEW_CAP_UC[g]
 
+            #power capacity for existing and new storage units
+            cIPStorOld[g in IP_STOR_OLD], 
+                vIP_CAP[g] == inputs.ip_generators.Existing_Cap_MW[g]
+            cIPStorNew[g in IP_STOR_NEW], 
+                vIP_CAP[g] == vIP_NEW_CAP_STOR[g]
+
             #max charge constraint
             cIPMaxCharge[t in inputs.T, g in inputs.IP_STOR], vIP_CHARGE[t,g] <= vIP_CAP[g]
+
+            #max discharge constraint
+            cIPMaxDischarge[t in inputs.T, g in inputs.IP_STOR], vIP_GEN[t,g] <= vIP_CAP[g]
             
             #max state of charge constraint
             cIPMaxSOC[t in inputs.T, g in inputs.IP_STOR], vIP_SOC[t,g] <= vIP_E_CAP[g]
@@ -618,7 +637,9 @@ function capacity_expansion(inputs, mipgap, CO2_constraint, CO2_limit, RE_constr
         #fixed costs for total storage capacity
         sum(inputs.ip_generators.Fixed_OM_Cost_per_MWhyr[g]*vIP_E_CAP[g] for g in inputs.IP_STOR) + 
         #investment costs for new storage energy capacity
-        sum(inputs.ip_generators.Inv_Cost_per_MWhyr[g]*vIP_NEW_E_CAP[g] for g in intersect(inputs.IP_STOR, inputs.IP_NEW))
+        sum(inputs.ip_generators.Inv_Cost_per_MWhyr[g]*vIP_NEW_E_CAP[g] for g in intersect(inputs.IP_STOR, inputs.IP_NEW)) +
+        #investment costs for new storage power capacity
+        sum(inputs.ip_generators.Inv_Cost_per_MWyr[g]*vIP_NEW_CAP_STOR[g] for g in IP_STOR_NEW)
         );
     
     #fixed cost for transmission
