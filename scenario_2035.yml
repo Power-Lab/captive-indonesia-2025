@@ -60,12 +60,24 @@ co2_limits:
     nusa_tenggara: 7760000
   "2035":
     sumatera: 60500000
+    sumatera_coal70: 60500000
+    sumatera_coal100: 60500000
     jawa_bali: 81200000
+    jawa_bali_coal70: 81200000
+    jawa_bali_coal100: 81200000
     kalimantan: 88600000
+    kalimantan_coal70: 88600000
+    kalimantan_coal100: 88600000
     sulawesi: 13500000
     sulawesi_coal70: 13500000    # coal-price variants: same as sulawesi
     sulawesi_coal100: 13500000
     north_maluku: 2700000
+    north_maluku_coal70: 2700000
+    north_maluku_coal100: 2700000
     maluku: 4100000
     papua: 10800000
+    papua_coal70: 10800000
+    papua_coal100: 10800000
     nusa_tenggara: 5400000
+    nusa_tenggara_coal70: 5400000
+    nusa_tenggara_coal100: 5400000

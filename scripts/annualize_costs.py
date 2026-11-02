@@ -11,13 +11,15 @@ Batteries had no power cost (Inv_Cost_per_MWyr 0), so their power capacity was f
 like the rest.
 
 Every row of a listed technology is annualised (only New_Build = 1 rows enter the objective).
-A technology that is not listed is left as it is if it has no New_Build = 1 row (existing coal
-and coal_captive units); a new-build row of an unlisted technology stops the script. Every
-change is logged to data_indonesia/corrections/annualized_costs_<year>_<island>.csv.
+A technology that is not listed is left as it is if it has no New_Build = 1 row (existing
+coal_captive units); a new-build row of an unlisted technology stops the script. A row with a
+blank technology and STOR = 1 (the park batteries of Kalimantan and North Maluku, named
+*_battery) is treated as a battery. Every change is logged to
+data_indonesia/corrections/annualized_costs_<year>_<island>.csv.
 
 network.csv is not changed: Line_Reinforcement_Cost_per_MWyr is a flat 35,178 $/MW on every
-Sulawesi line (100-350 km), which is already of annual size (about 350,000 $/MW overnight over
-40 years at 10 %), not an overnight line cost.
+line of every island (the Sulawesi lines are 100-350 km), which is already of annual size (about
+350,000 $/MW overnight over 40 years at 10 %), not an overnight line cost.
 
 Usage (from the repository root; refuses to run twice):
   python3 scripts/annualize_costs.py [--year 2035] [--island sulawesi]
@@ -31,7 +33,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WACC = 0.10
 LIFETIME = {'solar': 25, 'wind': 25, 'geothermal': 30, 'battery': 15, 'gas': 30, 'ccgt': 30,
             'hydropower': 50, 'hydropower_mini': 50, 'biomass': 25, 'biogas': 25, 'trash': 25,
-            'diesel': 20}
+            'diesel': 20, 'coal': 30, 'pumped_storage': 50}
 BATTERY_POWER_OVERNIGHT = 150000.0   # $/MW
 GUARD = 200000.0   # new-build solar above this is still overnight capex (560,000 before)
 
@@ -42,6 +44,11 @@ def crf(n, r=WACC):
 
 def fmt(x):
     return f'{x:.2f}'.rstrip('0').rstrip('.')
+
+
+def tech_of(r, c):
+    tech = r[c['technology']]
+    return 'battery' if tech == '' and r[c['STOR']].strip() == '1' else tech
 
 
 def parse(line):
@@ -75,11 +82,11 @@ def main():
         lines = text.split(eol)
         head = parse(lines[0])
         c = {k: head.index(k) for k in ('R_ID', 'Resource', 'technology', 'New_Build',
-                                       'Inv_Cost_per_MWyr', 'Inv_Cost_per_MWhyr')}
+                                       'Inv_Cost_per_MWyr', 'Inv_Cost_per_MWhyr', 'STOR')}
         rows = {i: parse(line) for i, line in enumerate(lines[1:], start=1) if line}
         for i, r in rows.items():
             assert unparse(r) == lines[i], f'{path}:{i + 1} does not round-trip through csv'
-            tech, new = r[c['technology']], r[c['New_Build']].strip() == '1'
+            tech, new = tech_of(r, c), r[c['New_Build']].strip() == '1'
             if tech == 'solar' and new and float(r[c['Inv_Cost_per_MWyr']]) < GUARD:
                 raise SystemExit(f'{name} R_ID {r[c["R_ID"]]}: new-build solar costs '
                                  f'{r[c["Inv_Cost_per_MWyr"]]} $/MW-yr, below {GUARD:.0f}: '
@@ -97,7 +104,7 @@ def main():
     for name, (path, bom, eol, lines, c, rows) in files.items():
         changed = 0
         for i, r in rows.items():
-            tech = r[c['technology']]
+            tech = tech_of(r, c)
             if tech not in LIFETIME:
                 continue
             n = LIFETIME[tech]
@@ -115,7 +122,7 @@ def main():
             changed += 1
         with open(path, 'wb') as f:
             f.write((b'\xef\xbb\xbf' if bom else b'') + eol.join(lines).encode('utf-8'))
-        left = sorted({r[c['technology']] for r in rows.values() if r[c['technology']] not in LIFETIME})
+        left = sorted({tech_of(r, c) for r in rows.values() if tech_of(r, c) not in LIFETIME})
         print(f'{args.year}/{args.island}/{name}: {changed} rows annualised'
               + (f'; left as is (existing units only): {", ".join(left)}' if left else ''))
     os.makedirs(os.path.dirname(log_path), exist_ok=True)

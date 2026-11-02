@@ -1,0 +1,2 @@
+year,source,output,file,Fuel,Cost_per_MMBtu_old,Cost_per_MMBtu_new,usd_per_t,mmbtu_per_t,usd_per_t_old
+2035,data_indonesia/2035/sumatera,data_indonesia/2035/sumatera_coal70,fuels_data.csv,coal_captive,3.846,4.199,70,16.67,64.1
