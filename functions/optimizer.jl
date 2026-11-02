@@ -146,7 +146,7 @@ function capacity_expansion(inputs, mipgap, CO2_constraint, CO2_limit, RE_constr
         sum(vCHARGE[t,g] for g in intersect(inputs.generators[inputs.generators.Zone.==z,:R_ID],inputs.STOR)) -
         inputs.demand[t,z] - 
         sum(inputs.lines[l,Symbol(string("z",z))] * vFLOW[t,l] for l in inputs.L) -
-        sum(vIP_IMPORT[t,ip] for ip in intersect(inputs.ip_generators[inputs.ip_generators.Zone.==z,:R_ID],inputs.IP)) == 0
+        sum(vIP_IMPORT[t,ip] for ip in inputs.IP if inputs.IP_ZONE[ip] == z) == 0
         )
     else
         #Supply Demand Balance Constraint

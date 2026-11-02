@@ -38,8 +38,10 @@ function input_data(filepath)
     #ID for all generators for easy reference
     G = generators.R_ID;
 
-    #set of zones
-    Z = convert(Array{Int64}, unique(collect(skipmissing(generators.Zone))));
+    #set of zones, in zone-number order: demand[t,z] below is read by column position, so the
+    #columns must be demand_z1, demand_z2, ... (unsorted, Jawa-Bali's first-appearance order
+    #1,2,3,4,6,7,5 gave zones 5, 6 and 7 each other's demand)
+    Z = sort(convert(Array{Int64}, unique(collect(skipmissing(generators.Zone)))));
 
     #Demand
     #reading reference demand input data
@@ -177,6 +179,16 @@ function input_data(filepath)
 
     #industrial park generators set
     IP_G = ip_generators.R_ID;
+
+    #grid zone of each industrial park (where its grid imports are drawn): the zone of its
+    #captive coal units, which every park has, all in one zone
+    IP_ZONE = Dict{Int64,Int64}()
+    for ip in IP
+        zs = unique(ip_generators.Zone[isequal.(ip_generators.Industrial_Park, ip) .&
+                                       isequal.(ip_generators.technology, "coal_captive")])
+        length(zs) == 1 || error("industrial park $ip: coal_captive units in zones $zs, expected exactly one zone")
+        IP_ZONE[ip] = convert(Int64, zs[1])
+    end
 
     #Industrial Park Demand
     if isfile(joinpath(filepath, "ip_demand.csv"))
@@ -375,6 +387,7 @@ function input_data(filepath)
         IP_OLD = IP_OLD,
         IP_RE = IP_RE,
         IP = IP,
+        IP_ZONE = IP_ZONE,
         IP_G = IP_G,
         IP_S = IP_S,
         IP_UC_OLD = IP_UC_OLD,

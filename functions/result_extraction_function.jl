@@ -86,14 +86,14 @@ function result_extraction(
     if all(value.(solution.IP_IMPORT) .== 0)
         ip_import = DataFrame(
             ID               = inputs.IP,
-            Zone             = inputs.ip_generators.Zone[inputs.IP],
+            Zone             = [inputs.IP_ZONE[ip] for ip in inputs.IP],
             Total_Import_MWh = zeros(length(inputs.IP)),
             Peak_Import_MW   = zeros(length(inputs.IP)),
         )
     else
         ip_import = DataFrame(
             ID               = inputs.IP,
-            Zone             = inputs.ip_generators.Zone[inputs.IP],
+            Zone             = [inputs.IP_ZONE[ip] for ip in inputs.IP],
             Total_Import_MWh = vec(sum(value.(solution.IP_IMPORT)[:, inputs.IP].data, dims=1)),
             Peak_Import_MW   = vec(maximum(value.(solution.IP_IMPORT)[:, inputs.IP].data, dims=1)),
         )
