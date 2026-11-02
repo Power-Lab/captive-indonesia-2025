@@ -140,7 +140,7 @@ function benders_subproblem(inputs, capacity_values, Grid, Captive, ImportPrice,
         vCHARGE[inputs.T, inputs.STOR] >= 0
         vSOC[inputs.T, inputs.STOR] >= 0
         vNSE[inputs.T, inputs.S, inputs.Z] >= 0
-        vFLOW[inputs.T, inputs.L] >= 0
+        vFLOW[inputs.T, inputs.L]   # signed; bounded by +-vT_CAP below
         
         # Unit commitment variables
         vSTART[inputs.T, inputs.UC], Bin

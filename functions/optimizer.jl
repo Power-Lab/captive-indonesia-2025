@@ -70,7 +70,7 @@ function capacity_expansion(inputs, mipgap, CO2_constraint, CO2_limit, RE_constr
             vCHARGE[inputs.T, inputs.STOR]     >= 0 # power charging (MW)
             vSOC[inputs.T, inputs.STOR]        >= 0 # energy storage state of charge (MW)
             vNSE[inputs.T, inputs.S, inputs.Z]  >= 0 # non-served energy/demand curtailment (MW)
-            vFLOW[inputs.T, inputs.L]           >= 0 # transmission line flow (MW)
+            vFLOW[inputs.T, inputs.L]                # transmission line flow (MW), signed: + from the line's +1 zone to its -1 zone, bounded by +-vT_CAP
             # vTHETA[inputs.T, inputs.Z]          >= 0 # theta angle for transmission lines (radians)
     end)
 
